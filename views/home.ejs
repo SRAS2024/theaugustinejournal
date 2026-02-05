@@ -1,0 +1,27 @@
+<%
+  const body = `
+    <section class="section card">
+      ${notices && notices.length ? `
+        <div>
+          ${notices.map(n => `<div class="notice" data-translate="content" data-original="${(n.message || "").replaceAll('"','&quot;')}">${n.message}</div>`).join("")}
+        </div>
+        <div style="height:14px"></div>
+      ` : ``}
+
+      <div class="about">
+        ${settings?.aboutHtml || ""}
+      </div>
+
+      <div class="latest">
+        <span class="label" data-i18n="seeLatest">See our latest post</span>
+        ${
+          latest
+            ? `<a href="/post/${latest.slug}">${latest.title}</a>`
+            : `<span class="muted">No posts yet.</span>`
+        }
+      </div>
+    </section>
+  `;
+%>
+
+<%- include("layout", { title: "The Augustine Journal", active: "home", body }) %>
