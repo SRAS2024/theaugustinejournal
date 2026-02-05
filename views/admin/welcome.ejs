@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Welcome | The Augustine Journal</title>
+    <link rel="stylesheet" href="/public/css/styles.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="container">
+        <h1 class="brand">The Augustine Journal</h1>
+        <div class="nav">
+          <span class="muted">Administrative Site</span>
+        </div>
+      </div>
+    </header>
+
+    <main class="container">
+      <section class="section card" style="max-width:620px;margin:22px auto;text-align:center;">
+        <h2 class="listTitle" style="margin-bottom:8px;">Welcome, <%= adminName || "Ryan" %>!</h2>
+        <p class="muted" style="margin-top:0;">Loading your dashboard…</p>
+
+        <div style="display:flex;justify-content:center;margin-top:18px;">
+          <div style="width:84px;height:84px;border-radius:999px;border:2px solid rgba(255,255,255,0.14);position:relative;">
+            <div id="ring"
+              style="position:absolute;inset:0;border-radius:999px;border:2px solid transparent;border-top-color: rgba(106,58,168,0.95);transform:rotate(0deg);">
+            </div>
+          </div>
+        </div>
+
+        <div style="height:18px"></div>
+
+        <div style="width:100%;height:10px;border-radius:999px;border:1px solid rgba(255,255,255,0.10);background:rgba(0,0,0,0.25);overflow:hidden;">
+          <div id="bar" style="height:100%;width:0%;background:rgba(106,58,168,0.85);"></div>
+        </div>
+      </section>
+    </main>
+
+    <script>
+      const bar = document.getElementById("bar");
+      const ring = document.getElementById("ring");
+      const total = 3000;
+      const start = performance.now();
+
+      function tick(now){
+        const t = Math.min(1, (now - start) / total);
+        bar.style.width = Math.round(t * 100) + "%";
+        ring.style.transform = "rotate(" + (t * 720) + "deg)";
+        if (t < 1) requestAnimationFrame(tick);
+        else window.location.href = "/admin/dashboard";
+      }
+      requestAnimationFrame(tick);
+    </script>
+  </body>
+</html>
