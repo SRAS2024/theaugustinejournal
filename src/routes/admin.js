@@ -8,19 +8,19 @@ import { nanoid } from "nanoid";
 
 import { prisma } from "../lib/db.js";
 import { requireAdmin } from "../middleware/auth.js";
-import { ensureUploadsDir } from "../lib/uploads.js";
+import { getUploadsDir, resolveUploadPath } from "../lib/uploads.js";
 import { sanitizeRichHtml } from "../lib/sanitize.js";
 import { isValidAdminUser, verifyAdminPassword } from "../lib/security.js";
 
 const router = Router();
 
-const uploadsDir = ensureUploadsDir();
+const uploadsDir = getUploadsDir();
 
 const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
+  destination: function (_req, _file, cb) {
     cb(null, uploadsDir);
   },
-  filename: function (req, file, cb) {
+  filename: function (_req, file, cb) {
     const safeBase = slugify(path.parse(file.originalname).name, { lower: true, strict: true });
     cb(null, `${safeBase}-${nanoid(8)}${path.extname(file.originalname).toLowerCase()}`);
   }
@@ -29,16 +29,18 @@ const storage = multer.diskStorage({
 const upload = multer({
   storage,
   limits: { fileSize: 15 * 1024 * 1024 },
-  fileFilter: (req, file, cb) => {
+  fileFilter: (_req, file, cb) => {
     const ext = path.extname(file.originalname).toLowerCase();
     if (ext !== ".pdf") return cb(new Error("Only PDF uploads are allowed."));
     cb(null, true);
   }
 });
 
-router.get("/", requireAdmin, (req, res) => res.redirect("/admin/dashboard"));
+/* ---------- auth ---------- */
 
-router.get("/login", (req, res) => {
+router.get("/", requireAdmin, (_req, res) => res.redirect("/admin/dashboard"));
+
+router.get("/login", (_req, res) => {
   res.render("admin/login", { error: "" });
 });
 
@@ -64,9 +66,11 @@ router.post("/logout", requireAdmin, (req, res) => {
   });
 });
 
-router.get("/welcome", requireAdmin, (req, res) => {
+router.get("/welcome", requireAdmin, (_req, res) => {
   res.render("admin/welcome");
 });
+
+/* ---------- dashboard ---------- */
 
 router.get("/dashboard", requireAdmin, async (req, res) => {
   const [settings, notices, postCount, blogCount, letterCount] = await Promise.all([
@@ -80,6 +84,8 @@ router.get("/dashboard", requireAdmin, async (req, res) => {
   const saved = req.query.saved === "true";
   res.render("admin/dashboard", { settings, notices, postCount, blogCount, letterCount, saved });
 });
+
+/* ---------- site settings ---------- */
 
 router.get("/settings", requireAdmin, async (req, res) => {
   const [settings, notices] = await Promise.all([
@@ -102,6 +108,8 @@ router.post("/settings", requireAdmin, async (req, res) => {
 
   res.redirect("/admin/settings?saved=true");
 });
+
+/* ---------- notices ---------- */
 
 router.post("/notices/add", requireAdmin, async (req, res) => {
   const message = String(req.body.message || "").trim();
@@ -137,6 +145,8 @@ router.post("/notices/:id/delete", requireAdmin, async (req, res) => {
   res.redirect("/admin/settings?saved=true");
 });
 
+/* ---------- posts listing ---------- */
+
 router.get("/posts", requireAdmin, async (req, res) => {
   const type = String(req.query.type || "ALL");
   const where =
@@ -151,7 +161,9 @@ router.get("/posts", requireAdmin, async (req, res) => {
   res.render("admin/posts", { posts, filter: type, saved });
 });
 
-router.get("/posts/new", requireAdmin, async (req, res) => {
+/* ---------- post form ---------- */
+
+router.get("/posts/new", requireAdmin, async (_req, res) => {
   res.render("admin/post-form", {
     mode: "create",
     post: null,
@@ -169,9 +181,20 @@ router.get("/posts/:id/edit", requireAdmin, async (req, res) => {
   });
 });
 
+/* ---------- helpers ---------- */
+
 function makeSlug(title) {
   const base = slugify(title, { lower: true, strict: true });
-  return base.length ? `${base}` : nanoid(10);
+  return base.length ? base : nanoid(10);
+}
+
+function escapeHtml(str) {
+  return String(str)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
 }
 
 function pdfTextToHtml(rawText) {
@@ -189,6 +212,16 @@ function pdfTextToHtml(rawText) {
     .filter(p => p.length > 0)
     .join("\n");
 }
+
+function removeFile(filePath) {
+  try {
+    if (filePath && fs.existsSync(filePath)) fs.unlinkSync(filePath);
+  } catch (err) {
+    console.error("Failed to remove file:", filePath, err.message);
+  }
+}
+
+/* ---------- create post ---------- */
 
 router.post("/posts/create", requireAdmin, upload.single("pdfFile"), async (req, res) => {
   try {
@@ -225,9 +258,8 @@ router.post("/posts/create", requireAdmin, upload.single("pdfFile"), async (req,
       const dataBuffer = fs.readFileSync(fileFullPath);
       const parsed = await pdfParse(dataBuffer);
 
-      const rawText = (parsed.text || "").trim();
       contentType = "PDF";
-      contentHtml = pdfTextToHtml(rawText);
+      contentHtml = pdfTextToHtml((parsed.text || "").trim());
       pdfPath = `/uploads/${req.file.filename}`;
     } else {
       const richHtml = sanitizeRichHtml(String(req.body.contentHtml || ""));
@@ -240,7 +272,6 @@ router.post("/posts/create", requireAdmin, upload.single("pdfFile"), async (req,
     }
 
     const slugBase = makeSlug(title);
-
     let slug = slugBase;
     const collision = await prisma.post.findUnique({ where: { slug } });
     if (collision) slug = `${slugBase}-${nanoid(6)}`;
@@ -264,6 +295,8 @@ router.post("/posts/create", requireAdmin, upload.single("pdfFile"), async (req,
     res.status(500).send("Failed to create post.");
   }
 });
+
+/* ---------- update post ---------- */
 
 router.post("/posts/:id/update", requireAdmin, upload.single("pdfFile"), async (req, res) => {
   const id = req.params.id;
@@ -300,16 +333,14 @@ router.post("/posts/:id/update", requireAdmin, upload.single("pdfFile"), async (
 
       if (req.file) {
         if (existing.pdfPath) {
-          const oldFsPath = path.join(process.cwd(), existing.pdfPath.replace("/uploads/", "uploads/"));
-          if (fs.existsSync(oldFsPath)) fs.unlinkSync(oldFsPath);
+          removeFile(resolveUploadPath(existing.pdfPath));
         }
 
         const fileFullPath = path.join(uploadsDir, req.file.filename);
         const dataBuffer = fs.readFileSync(fileFullPath);
         const parsed = await pdfParse(dataBuffer);
 
-        const rawText = (parsed.text || "").trim();
-        contentHtml = pdfTextToHtml(rawText);
+        contentHtml = pdfTextToHtml((parsed.text || "").trim());
         pdfPath = `/uploads/${req.file.filename}`;
       }
     } else {
@@ -320,12 +351,11 @@ router.post("/posts/:id/update", requireAdmin, upload.single("pdfFile"), async (
         return res.status(400).render("admin/post-form", { mode: "edit", post: existing, error: "Content is required in editor mode." });
       }
       contentHtml = richHtml;
-      pdfPath = null;
 
       if (existing.pdfPath) {
-        const oldFsPath = path.join(process.cwd(), existing.pdfPath.replace("/uploads/", "uploads/"));
-        if (fs.existsSync(oldFsPath)) fs.unlinkSync(oldFsPath);
+        removeFile(resolveUploadPath(existing.pdfPath));
       }
+      pdfPath = null;
     }
 
     const newSlugBase = makeSlug(title);
@@ -357,27 +387,19 @@ router.post("/posts/:id/update", requireAdmin, upload.single("pdfFile"), async (
   }
 });
 
+/* ---------- delete post ---------- */
+
 router.post("/posts/:id/delete", requireAdmin, async (req, res) => {
   const id = req.params.id;
   const post = await prisma.post.findUnique({ where: { id } });
   if (!post) return res.redirect("/admin/posts");
 
   if (post.pdfPath) {
-    const oldFsPath = path.join(process.cwd(), post.pdfPath.replace("/uploads/", "uploads/"));
-    if (fs.existsSync(oldFsPath)) fs.unlinkSync(oldFsPath);
+    removeFile(resolveUploadPath(post.pdfPath));
   }
 
   await prisma.post.delete({ where: { id } });
   res.redirect("/admin/posts?saved=true");
 });
-
-function escapeHtml(str) {
-  return String(str)
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#039;");
-}
 
 export default router;

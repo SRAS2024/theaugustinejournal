@@ -71,13 +71,14 @@ theaugustinejournal/
   prisma/
     schema.prisma            # Database schema
     seed.js                  # Default data seeding
+    migrations/              # SQL migrations for prisma migrate deploy
   src/
     lib/
       db.js                  # Prisma client
       sanitize.js            # HTML sanitization
       security.js            # Admin authentication
       translate.js           # Translation API integration
-      uploads.js             # File upload utilities
+      uploads.js             # File upload utilities (UPLOAD_DIR aware)
     middleware/
       auth.js                # Admin session guard
       attachLocals.js        # Template locals (CSRF, session)
@@ -106,12 +107,22 @@ theaugustinejournal/
       posts.ejs              # Post management list
       post-form.ejs          # Create/edit post form
       edit-settings.ejs      # Site settings and notices
-  uploads/                   # PDF file storage
+  uploads/                   # PDF file storage (or use UPLOAD_DIR)
 ```
 
 ---
 
 ## Deployment (Railway)
+
+### Scripts
+
+| Script | Purpose |
+|--------|---------|
+| `npm run build` | Runs `prisma generate` to create the Prisma Client |
+| `npm start` | Runs `node server.js` (the web server only) |
+| `npm run railway:db:setup` | Runs `prisma migrate deploy && node prisma/seed.js` |
+
+Railway runs `npm install`, then `npm run build`, then `npm start` by default. Run `railway:db:setup` once (or on schema changes) to apply migrations and seed default data.
 
 ### Environment Variables
 
@@ -123,17 +134,24 @@ Railway provides `PORT` and `DATABASE_URL` automatically when a PostgreSQL servi
 | `PORT` | Server port (default: 8080) |
 | `SESSION_SECRET` | Random string for session encryption |
 | `NODE_ENV` | Set to `production` for secure cookies |
+| `UPLOAD_DIR` | Optional: persistent volume mount path for PDF uploads |
 | `TRANSLATE_API_URL` | Optional: LibreTranslate endpoint for API-based translation |
 | `TRANSLATE_API_KEY` | Optional: API key for translation service |
 
-### Build & Start
+### Health Check
 
-Railway runs these scripts automatically:
+`GET /health` returns `200 OK` with `{ "status": "ok", "db": true }`. This endpoint has no database dependency and responds immediately.
 
-```
-npm install         # Install dependencies
-npm run build       # npx prisma generate
-npm start           # npx prisma db push && node prisma/seed.js && node server.js
+### Database Migrations
+
+Production uses `prisma migrate deploy` (deterministic, safe). Reserve `prisma db push` for local development only.
+
+```bash
+# Apply migrations in production
+npm run railway:db:setup
+
+# Local development: push schema directly
+npx prisma db push
 ```
 
 ### Custom Domain
@@ -156,7 +174,7 @@ npm install
 cp .env.example .env
 # Edit .env with your local PostgreSQL connection string
 
-# 4. Set up database
+# 4. Generate Prisma Client and push schema
 npx prisma generate
 npx prisma db push
 node prisma/seed.js
