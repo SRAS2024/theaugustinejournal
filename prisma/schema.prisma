@@ -19,7 +19,7 @@ enum ContentType {
 
 model SiteSettings {
   id             Int      @id @default(1)
-  aboutHtml      String   @default("<p>Welcome to The Augustine Journal. This text is an example. You can edit it in the administrative site.</p>")
+  aboutHtml      String   @default("<p>The Augustine Journal is a publication dedicated to thoughtful reflection and discourse. Founded on the principles of truth, wisdom, and intellectual inquiry, we seek to engage readers through carefully curated essays, letters, and commentary on the matters that shape our understanding of the world.</p>")
   updatedAt      DateTime @updatedAt
 }
 

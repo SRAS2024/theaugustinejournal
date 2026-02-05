@@ -77,7 +77,8 @@ router.get("/dashboard", requireAdmin, async (req, res) => {
     prisma.post.count({ where: { type: "LETTER" } })
   ]);
 
-  res.render("admin/dashboard", { settings, notices, postCount, blogCount, letterCount });
+  const saved = req.query.saved === "true";
+  res.render("admin/dashboard", { settings, notices, postCount, blogCount, letterCount, saved });
 });
 
 router.get("/settings", requireAdmin, async (req, res) => {
@@ -86,7 +87,8 @@ router.get("/settings", requireAdmin, async (req, res) => {
     prisma.notice.findMany({ orderBy: { order: "asc" } })
   ]);
 
-  res.render("admin/edit-settings", { settings, notices, error: "" });
+  const saved = req.query.saved === "true";
+  res.render("admin/edit-settings", { settings, notices, error: "", saved });
 });
 
 router.post("/settings", requireAdmin, async (req, res) => {
@@ -98,7 +100,7 @@ router.post("/settings", requireAdmin, async (req, res) => {
     create: { id: 1, aboutHtml }
   });
 
-  res.redirect("/admin/settings");
+  res.redirect("/admin/settings?saved=true");
 });
 
 router.post("/notices/add", requireAdmin, async (req, res) => {
@@ -112,7 +114,7 @@ router.post("/notices/add", requireAdmin, async (req, res) => {
     data: { id: nanoid(), message, order: count + 1 }
   });
 
-  res.redirect("/admin/settings");
+  res.redirect("/admin/settings?saved=true");
 });
 
 router.post("/notices/:id/update", requireAdmin, async (req, res) => {
@@ -121,7 +123,7 @@ router.post("/notices/:id/update", requireAdmin, async (req, res) => {
     where: { id: req.params.id },
     data: { message }
   });
-  res.redirect("/admin/settings");
+  res.redirect("/admin/settings?saved=true");
 });
 
 router.post("/notices/:id/delete", requireAdmin, async (req, res) => {
@@ -132,7 +134,7 @@ router.post("/notices/:id/delete", requireAdmin, async (req, res) => {
     await prisma.notice.update({ where: { id: notices[i].id }, data: { order: i + 1 } });
   }
 
-  res.redirect("/admin/settings");
+  res.redirect("/admin/settings?saved=true");
 });
 
 router.get("/posts", requireAdmin, async (req, res) => {
@@ -145,7 +147,8 @@ router.get("/posts", requireAdmin, async (req, res) => {
     orderBy: [{ postDate: "desc" }, { createdAt: "desc" }]
   });
 
-  res.render("admin/posts", { posts, filter: type });
+  const saved = req.query.saved === "true";
+  res.render("admin/posts", { posts, filter: type, saved });
 });
 
 router.get("/posts/new", requireAdmin, async (req, res) => {
@@ -169,6 +172,22 @@ router.get("/posts/:id/edit", requireAdmin, async (req, res) => {
 function makeSlug(title) {
   const base = slugify(title, { lower: true, strict: true });
   return base.length ? `${base}` : nanoid(10);
+}
+
+function pdfTextToHtml(rawText) {
+  if (!rawText || !rawText.trim()) {
+    return "<p>PDF uploaded, but no selectable text was found.</p>";
+  }
+  const paragraphs = rawText.split(/\n\s*\n/);
+  return paragraphs
+    .map(p => {
+      const trimmed = p.trim();
+      if (!trimmed) return "";
+      const escaped = escapeHtml(trimmed).replace(/\n/g, "<br>");
+      return `<p>${escaped}</p>`;
+    })
+    .filter(p => p.length > 0)
+    .join("\n");
 }
 
 router.post("/posts/create", requireAdmin, upload.single("pdfFile"), async (req, res) => {
@@ -207,11 +226,8 @@ router.post("/posts/create", requireAdmin, upload.single("pdfFile"), async (req,
       const parsed = await pdfParse(dataBuffer);
 
       const rawText = (parsed.text || "").trim();
-      const safeText = rawText || "PDF uploaded, but no selectable text was found.";
-      const html = `<pre class="pdf-text">${escapeHtml(safeText)}</pre>`;
-
       contentType = "PDF";
-      contentHtml = html;
+      contentHtml = pdfTextToHtml(rawText);
       pdfPath = `/uploads/${req.file.filename}`;
     } else {
       const richHtml = sanitizeRichHtml(String(req.body.contentHtml || ""));
@@ -242,7 +258,7 @@ router.post("/posts/create", requireAdmin, upload.single("pdfFile"), async (req,
       }
     });
 
-    res.redirect("/admin/posts");
+    res.redirect("/admin/posts?saved=true");
   } catch (e) {
     console.error(e);
     res.status(500).send("Failed to create post.");
@@ -293,8 +309,7 @@ router.post("/posts/:id/update", requireAdmin, upload.single("pdfFile"), async (
         const parsed = await pdfParse(dataBuffer);
 
         const rawText = (parsed.text || "").trim();
-        const safeText = rawText || "PDF uploaded, but no selectable text was found.";
-        contentHtml = `<pre class="pdf-text">${escapeHtml(safeText)}</pre>`;
+        contentHtml = pdfTextToHtml(rawText);
         pdfPath = `/uploads/${req.file.filename}`;
       }
     } else {
@@ -335,7 +350,7 @@ router.post("/posts/:id/update", requireAdmin, upload.single("pdfFile"), async (
       }
     });
 
-    res.redirect("/admin/posts");
+    res.redirect("/admin/posts?saved=true");
   } catch (e) {
     console.error(e);
     res.status(500).send("Failed to update post.");
@@ -353,7 +368,7 @@ router.post("/posts/:id/delete", requireAdmin, async (req, res) => {
   }
 
   await prisma.post.delete({ where: { id } });
-  res.redirect("/admin/posts");
+  res.redirect("/admin/posts?saved=true");
 });
 
 function escapeHtml(str) {
