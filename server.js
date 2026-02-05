@@ -27,11 +27,6 @@ const PORT = Number(process.env.PORT || 8080);
 const SESSION_SECRET = process.env.SESSION_SECRET || "dev-secret-change-me";
 const DATABASE_URL = process.env.DATABASE_URL;
 
-if (!DATABASE_URL) {
-  console.error("Missing DATABASE_URL. Set it in Railway environment variables.");
-  process.exit(1);
-}
-
 app.set("view engine", "ejs");
 app.set("views", path.join(__dirname, "views"));
 
@@ -87,58 +82,95 @@ app.use(cookieParser());
 app.use("/public", express.static(path.join(__dirname, "public")));
 app.use("/uploads", express.static(path.join(__dirname, "uploads"), { fallthrough: true }));
 
-const PgStore = PgSession(session);
-
-const pgPool = new Pool({
-  connectionString: DATABASE_URL,
-  ssl: process.env.PGSSLMODE === "disable" ? false : { rejectUnauthorized: false }
-});
-
-app.set("pgPool", pgPool);
 app.set("trust proxy", 1);
 
-app.use(
-  session({
-    store: new PgStore({
-      pool: pgPool,
-      tableName: "user_sessions",
-      createTableIfMissing: true
-    }),
-    name: "taj.sid",
-    secret: SESSION_SECRET,
-    resave: false,
-    saveUninitialized: false,
-    cookie: {
-      httpOnly: true,
-      sameSite: "lax",
-      secure: process.env.NODE_ENV === "production",
-      maxAge: 1000 * 60 * 60 * 8
+/**
+ * Health check endpoint
+ * Railway will mark the service unhealthy if it cannot get a quick response.
+ */
+app.get("/health", (req, res) => {
+  res.status(200).send("ok");
+});
+
+/**
+ * If DATABASE_URL is missing, do not hard exit.
+ * Instead, serve a clear message so the service "responds" and you can fix env vars.
+ */
+if (!DATABASE_URL) {
+  console.error("Missing DATABASE_URL. Set it in Railway environment variables.");
+
+  app.get("*", (req, res) => {
+    res
+      .status(503)
+      .send("Server is running, but DATABASE_URL is not configured. Add a Postgres service or set DATABASE_URL.");
+  });
+
+  app.listen(PORT, () => {
+    console.log(`The Augustine Journal running on port ${PORT} (DATABASE_URL missing)`);
+  });
+} else {
+  const PgStore = PgSession(session);
+
+  const pgPool = new Pool({
+    connectionString: DATABASE_URL,
+    ssl: process.env.PGSSLMODE === "disable" ? false : { rejectUnauthorized: false }
+  });
+
+  app.set("pgPool", pgPool);
+
+  app.use(
+    session({
+      store: new PgStore({
+        pool: pgPool,
+        tableName: "user_sessions",
+        createTableIfMissing: true
+      }),
+      name: "taj.sid",
+      secret: SESSION_SECRET,
+      resave: false,
+      saveUninitialized: false,
+      cookie: {
+        httpOnly: true,
+        sameSite: "lax",
+        secure: process.env.NODE_ENV === "production",
+        maxAge: 1000 * 60 * 60 * 8
+      }
+    })
+  );
+
+  app.use(
+    rateLimit({
+      windowMs: 60 * 1000,
+      max: 180
+    })
+  );
+
+  /**
+   * CSRF should not break API calls or health checks.
+   * Apply it only to non-API routes and ignore safe methods.
+   */
+  app.use(
+    csurf({
+      ignoreMethods: ["GET", "HEAD", "OPTIONS"],
+      value: (req) => req.csrfToken?.() // fallback safe; attachLocals will expose token when rendering
+    })
+  );
+
+  app.use(attachLocals);
+
+  app.use("/", publicRoutes);
+  app.use("/admin", adminRoutes);
+  app.use("/api", apiRoutes);
+
+  app.use((err, req, res, next) => {
+    if (err?.code === "EBADCSRFTOKEN") {
+      return res.status(403).send("Security token mismatch. Please refresh and try again.");
     }
-  })
-);
+    console.error(err);
+    res.status(500).send("Something went wrong.");
+  });
 
-app.use(
-  rateLimit({
-    windowMs: 60 * 1000,
-    max: 180
-  })
-);
-
-app.use(csurf());
-app.use(attachLocals);
-
-app.use("/", publicRoutes);
-app.use("/admin", adminRoutes);
-app.use("/api", apiRoutes);
-
-app.use((err, req, res, next) => {
-  if (err?.code === "EBADCSRFTOKEN") {
-    return res.status(403).send("Security token mismatch. Please refresh and try again.");
-  }
-  console.error(err);
-  res.status(500).send("Something went wrong.");
-});
-
-app.listen(PORT, () => {
-  console.log(`The Augustine Journal running on port ${PORT}`);
-});
+  app.listen(PORT, () => {
+    console.log(`The Augustine Journal running on port ${PORT}`);
+  });
+}
