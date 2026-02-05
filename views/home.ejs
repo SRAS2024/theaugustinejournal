@@ -2,14 +2,13 @@
   const body = `
     <section class="section card">
       ${notices && notices.length ? `
-        <div>
-          ${notices.map(n => `<div class="notice" data-translate="content" data-original="${(n.message || "").replaceAll('"','&quot;')}">${n.message}</div>`).join("")}
+        <div class="notices-wrap">
+          ${notices.map(n => `<div class="notice" data-translate="content" data-original="${(n.message || '').replace(/"/g,'&quot;')}">${n.message}</div>`).join('')}
         </div>
-        <div style="height:14px"></div>
-      ` : ``}
+      ` : ''}
 
-      <div class="about">
-        ${settings?.aboutHtml || ""}
+      <div class="about" data-translate="content" data-original="${(settings?.aboutHtml || '').replace(/<[^>]+>/g, '').replace(/"/g,'&quot;')}">
+        ${settings?.aboutHtml || ''}
       </div>
 
       <div class="latest">
@@ -17,7 +16,7 @@
         ${
           latest
             ? `<a href="/post/${latest.slug}">${latest.title}</a>`
-            : `<span class="muted">No posts yet.</span>`
+            : `<span class="muted" data-i18n="noPostsYet">No posts yet.</span>`
         }
       </div>
     </section>

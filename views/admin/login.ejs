@@ -2,53 +2,42 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Administrative Site | The Augustine Journal</title>
     <link rel="stylesheet" href="/public/css/styles.css" />
   </head>
   <body>
     <header class="topbar">
-      <div class="container">
+      <div class="container header-inner">
         <h1 class="brand">The Augustine Journal</h1>
-        <div class="nav">
+        <div class="admin-nav">
           <span class="muted">Administrative Site</span>
         </div>
       </div>
     </header>
 
-    <main class="container">
-      <section class="section card" style="max-width:520px;margin:22px auto;">
-        <h2 class="listTitle" style="margin-bottom:10px;">Administrative Site</h2>
+    <main class="container" style="max-width:480px;">
+      <section class="section card">
+        <h2 class="listTitle" style="margin-bottom:16px;">Administrative Site</h2>
 
         <% if (error) { %>
-          <div class="notice"><%= error %></div>
-          <div style="height:12px"></div>
+          <div class="alert-error"><%= error %></div>
         <% } %>
 
         <form method="POST" action="/admin/login">
           <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
 
-          <div class="grid2">
-            <div>
-              <label class="muted" for="username">Username</label>
-              <input id="username" name="username" type="text" required
-                style="width:100%;margin-top:6px;padding:10px 12px;border-radius:12px;border:1px solid rgba(255,255,255,0.12);background:rgba(0,0,0,0.25);color:var(--text);" />
-            </div>
-
-            <div>
-              <label class="muted" for="password">Password</label>
-              <input id="password" name="password" type="password" required
-                style="width:100%;margin-top:6px;padding:10px 12px;border-radius:12px;border:1px solid rgba(255,255,255,0.12);background:rgba(0,0,0,0.25);color:var(--text);" />
-            </div>
+          <div style="margin-bottom:14px;">
+            <label class="form-label" for="username">Username</label>
+            <input id="username" name="username" type="text" required class="form-input" autocomplete="username" />
           </div>
 
-          <div style="height:14px"></div>
+          <div style="margin-bottom:18px;">
+            <label class="form-label" for="password">Password</label>
+            <input id="password" name="password" type="password" required class="form-input" autocomplete="current-password" />
+          </div>
 
           <button class="btn primary" type="submit" style="width:100%;">Sign in</button>
-
-          <p class="muted" style="margin-top:14px;font-size:12px;line-height:1.5;">
-            Security note: these credentials are currently hardcoded in the server. For a production site, move them into environment variables.
-          </p>
         </form>
       </section>
     </main>

@@ -10,7 +10,7 @@ async function main() {
     create: {
       id: 1,
       aboutHtml:
-        "<p>Welcome to The Augustine Journal. This text is an example. You can edit it in the administrative site.</p>"
+        "<p>The Augustine Journal is a publication dedicated to thoughtful reflection and discourse. Founded on the principles of truth, wisdom, and intellectual inquiry, we seek to engage readers through carefully curated essays, letters, and commentary on the matters that shape our understanding of the world.</p>"
     }
   });
 
@@ -18,7 +18,7 @@ async function main() {
   if (existingNotices === 0) {
     await prisma.notice.createMany({
       data: [
-        { id: nanoid(), message: "This is an example notice. Edit or delete it in /admin.", order: 1 }
+        { id: nanoid(), message: "Welcome to The Augustine Journal. This is an example notice.", order: 1 }
       ]
     });
   }

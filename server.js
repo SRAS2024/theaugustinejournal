@@ -35,7 +35,49 @@ if (!DATABASE_URL) {
 app.set("view engine", "ejs");
 app.set("views", path.join(__dirname, "views"));
 
-app.use(helmet());
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: [
+          "'self'",
+          "'unsafe-inline'",
+          "'unsafe-eval'",
+          "https://cdn.jsdelivr.net",
+          "https://translate.google.com",
+          "https://translate.googleapis.com",
+          "https://translate-pa.googleapis.com"
+        ],
+        styleSrc: [
+          "'self'",
+          "'unsafe-inline'",
+          "https://cdn.jsdelivr.net",
+          "https://translate.googleapis.com",
+          "https://fonts.googleapis.com"
+        ],
+        imgSrc: [
+          "'self'",
+          "data:",
+          "https://translate.google.com",
+          "https://www.google.com",
+          "https://www.gstatic.com",
+          "https://*.gstatic.com"
+        ],
+        frameSrc: ["'self'", "https://translate.google.com"],
+        connectSrc: [
+          "'self'",
+          "https://translate.googleapis.com",
+          "https://translate-pa.googleapis.com"
+        ],
+        fontSrc: ["'self'", "https://fonts.gstatic.com", "https://fonts.googleapis.com"]
+      }
+    },
+    crossOriginEmbedderPolicy: false,
+    crossOriginResourcePolicy: { policy: "cross-origin" }
+  })
+);
+
 app.use(morgan("combined"));
 
 app.use(express.json({ limit: "1mb" }));
@@ -53,7 +95,6 @@ const pgPool = new Pool({
 });
 
 app.set("pgPool", pgPool);
-
 app.set("trust proxy", 1);
 
 app.use(

@@ -1,14 +1,16 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" translate="yes">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <meta name="theme-color" content="#0b0b0f" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#0a0a0e" />
+    <meta name="description" content="The Augustine Journal — thoughtful reflection and discourse." />
     <title><%= title %></title>
     <link rel="stylesheet" href="/public/css/styles.css" />
-    <script src="/public/js/i18n.js" defer></script>
   </head>
   <body>
+    <div id="google_translate_element"></div>
+
     <%- include("partials/header", { active }) %>
 
     <main class="container">
@@ -16,5 +18,7 @@
     </main>
 
     <%- include("partials/footer") %>
+
+    <script src="/public/js/i18n.js"></script>
   </body>
 </html>
