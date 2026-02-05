@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="theme-color" content="#0b0b0f" />
+    <title><%= title %></title>
+    <link rel="stylesheet" href="/public/css/styles.css" />
+    <script src="/public/js/i18n.js" defer></script>
+  </head>
+  <body>
+    <%- include("partials/header", { active }) %>
+
+    <main class="container">
+      <%- body %>
+    </main>
+
+    <%- include("partials/footer") %>
+  </body>
+</html>
