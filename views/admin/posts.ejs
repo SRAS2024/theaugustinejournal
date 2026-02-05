@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Posts | The Augustine Journal</title>
+    <link rel="stylesheet" href="/public/css/styles.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="container">
+        <h1 class="brand">The Augustine Journal</h1>
+        <nav class="nav">
+          <a href="/" class="">View Site</a>
+          <a href="/admin/dashboard">Dashboard</a>
+          <a href="/admin/posts" class="active">Posts</a>
+          <a href="/admin/settings">Site Settings</a>
+          <form method="POST" action="/admin/logout" style="display:inline;">
+            <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
+            <button class="btn" type="submit" style="padding:8px 12px;">Log out</button>
+          </form>
+        </nav>
+      </div>
+    </header>
+
+    <main class="container">
+      <section class="section card">
+        <h2 class="listTitle">Posts</h2>
+
+        <div style="display:flex;justify-content:center;gap:10px;flex-wrap:wrap;margin-bottom:12px;">
+          <a class="btn <%= filter === 'ALL' ? 'primary' : '' %>" href="/admin/posts?type=ALL">All</a>
+          <a class="btn <%= filter === 'BLOG' ? 'primary' : '' %>" href="/admin/posts?type=BLOG">Blog</a>
+          <a class="btn <%= filter === 'LETTER' ? 'primary' : '' %>" href="/admin/posts?type=LETTER">Letters</a>
+          <a class="btn primary" href="/admin/posts/new">Create Post</a>
+        </div>
+
+        <% if (!posts || posts.length === 0) { %>
+          <div class="muted" style="text-align:center;">No posts yet.</div>
+        <% } %>
+
+        <div style="display:grid;gap:10px;">
+          <% (posts || []).forEach(function(p){ %>
+            <div class="postRow">
+              <div>
+                <div class="title" style="margin:0;"><a href="/post/<%= p.slug %>" target="_blank" rel="noopener noreferrer"><%= p.title %></a></div>
+                <div class="muted" style="margin-top:6px;font-size:12px;">
+                  <%= p.type === 'BLOG' ? 'Blog' : 'Letter' %> •
+                  <%= new Date(p.postDate).toLocaleDateString(undefined, { year:'numeric', month:'long', day:'numeric' }) %> •
+                  <%= p.contentType === 'PDF' ? 'PDF' : 'Editor' %>
+                </div>
+              </div>
+
+              <div style="display:flex;gap:10px;align-items:center;">
+                <a class="btn" href="/admin/posts/<%= p.id %>/edit">Edit</a>
+                <form method="POST" action="/admin/posts/<%= p.id %>/delete" onsubmit="return confirm('Delete this post?');">
+                  <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
+                  <button class="btn" type="submit">Delete</button>
+                </form>
+              </div>
+            </div>
+          <% }) %>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>
