@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Site Settings | The Augustine Journal</title>
+    <link rel="stylesheet" href="/public/css/styles.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="container">
+        <h1 class="brand">The Augustine Journal</h1>
+        <nav class="nav">
+          <a href="/" class="">View Site</a>
+          <a href="/admin/dashboard">Dashboard</a>
+          <a href="/admin/posts">Posts</a>
+          <a href="/admin/settings" class="active">Site Settings</a>
+          <form method="POST" action="/admin/logout" style="display:inline;">
+            <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
+            <button class="btn" type="submit" style="padding:8px 12px;">Log out</button>
+          </form>
+        </nav>
+      </div>
+    </header>
+
+    <main class="container">
+      <section class="section card">
+        <h2 class="listTitle">Site Settings</h2>
+
+        <div class="postRow" style="margin-bottom:12px;">
+          <div style="width:100%;">
+            <div class="muted" style="margin-bottom:8px;">Home page text (editable)</div>
+
+            <form method="POST" action="/admin/settings">
+              <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
+              <textarea name="aboutHtml" rows="7"
+                style="width:100%;padding:12px;border-radius:14px;border:1px solid rgba(255,255,255,0.12);background:rgba(0,0,0,0.25);color:var(--text);font-family:ui-sans-serif,system-ui;line-height:1.55;"><%= settings?.aboutHtml || "" %></textarea>
+
+              <div style="height:10px"></div>
+              <button class="btn primary" type="submit">Save</button>
+            </form>
+          </div>
+        </div>
+
+        <div class="postRow">
+          <div style="width:100%;">
+            <div class="muted" style="margin-bottom:8px;">Notices (max 3)</div>
+
+            <div style="display:grid;gap:10px;">
+              <% (notices || []).forEach(function(n){ %>
+                <form method="POST" action="/admin/notices/<%= n.id %>/update" class="postRow" style="margin:0;">
+                  <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
+                  <input name="message" value="<%= n.message %>" required
+                    style="width:100%;padding:10px 12px;border-radius:12px;border:1px solid rgba(255,255,255,0.12);background:rgba(0,0,0,0.25);color:var(--text);font-family:ui-sans-serif,system-ui;" />
+                  <button class="btn" type="submit">Save</button>
+                </form>
+
+                <form method="POST" action="/admin/notices/<%= n.id %>/delete" style="text-align:right;">
+                  <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
+                  <button class="btn" type="submit">Delete</button>
+                </form>
+              <% }) %>
+            </div>
+
+            <% if ((notices || []).length < 3) { %>
+              <div style="height:14px"></div>
+              <form method="POST" action="/admin/notices/add" class="grid2">
+                <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
+                <div style="grid-column:1/-1;">
+                  <input name="message" placeholder="Add a notice…" required
+                    style="width:100%;padding:10px 12px;border-radius:12px;border:1px solid rgba(255,255,255,0.12);background:rgba(0,0,0,0.25);color:var(--text);font-family:ui-sans-serif,system-ui;" />
+                </div>
+                <div style="grid-column:1/-1;">
+                  <button class="btn primary" type="submit">Add Notice</button>
+                </div>
+              </form>
+            <% } %>
+
+          </div>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>
