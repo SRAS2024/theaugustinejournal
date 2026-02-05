@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Dashboard | The Augustine Journal</title>
+    <link rel="stylesheet" href="/public/css/styles.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="container">
+        <h1 class="brand">The Augustine Journal</h1>
+        <nav class="nav">
+          <a href="/" class="">View Site</a>
+          <a href="/admin/dashboard" class="active">Dashboard</a>
+          <a href="/admin/posts">Posts</a>
+          <a href="/admin/settings">Site Settings</a>
+          <form method="POST" action="/admin/logout" style="display:inline;">
+            <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
+            <button class="btn" type="submit" style="padding:8px 12px;">Log out</button>
+          </form>
+        </nav>
+      </div>
+    </header>
+
+    <main class="container">
+      <section class="section card">
+        <h2 class="listTitle" style="margin-bottom:10px;">Administrative Dashboard</h2>
+
+        <div class="grid2">
+          <div class="postRow">
+            <div>
+              <div class="muted">Total Posts</div>
+              <div style="font-size:26px;font-weight:700;margin-top:6px;font-family:ui-sans-serif,system-ui;"> <%= postCount %> </div>
+            </div>
+          </div>
+
+          <div class="postRow">
+            <div>
+              <div class="muted">Blog</div>
+              <div style="font-size:26px;font-weight:700;margin-top:6px;font-family:ui-sans-serif,system-ui;"> <%= blogCount %> </div>
+            </div>
+          </div>
+
+          <div class="postRow">
+            <div>
+              <div class="muted">Letters</div>
+              <div style="font-size:26px;font-weight:700;margin-top:6px;font-family:ui-sans-serif,system-ui;"> <%= letterCount %> </div>
+            </div>
+          </div>
+
+          <div class="postRow">
+            <div>
+              <div class="muted">Notices</div>
+              <div style="font-size:26px;font-weight:700;margin-top:6px;font-family:ui-sans-serif,system-ui;"> <%= (notices || []).length %> / 3 </div>
+            </div>
+          </div>
+        </div>
+
+        <div style="height:14px"></div>
+
+        <div style="display:flex;justify-content:center;gap:10px;flex-wrap:wrap;">
+          <a class="btn primary" href="/admin/posts/new">Create Post</a>
+          <a class="btn" href="/admin/posts">Manage Posts</a>
+          <a class="btn" href="/admin/settings">Edit Site Settings</a>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>
