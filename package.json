@@ -6,12 +6,13 @@
   "main": "server.js",
   "scripts": {
     "build": "npx prisma generate",
-    "start": "npx prisma db push --skip-generate && node prisma/seed.js && node server.js",
+    "start": "node server.js",
     "dev": "node server.js",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate deploy",
     "prisma:studio": "prisma studio",
-    "seed": "node prisma/seed.js"
+    "seed": "node prisma/seed.js",
+    "railway:db:setup": "npx prisma migrate deploy && node prisma/seed.js"
   },
   "dependencies": {
     "@prisma/client": "^5.19.1",
