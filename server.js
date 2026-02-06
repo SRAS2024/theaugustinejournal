@@ -1,3 +1,4 @@
+import crypto from "crypto";
 import express from "express";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -23,8 +24,8 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 
-const PORT = Number(process.env.PORT || 8080);
-const SESSION_SECRET = process.env.SESSION_SECRET || "dev-secret-change-me";
+const PORT = 8080;
+const SESSION_SECRET = crypto.randomBytes(32).toString("hex");
 const DATABASE_URL = process.env.DATABASE_URL;
 
 app.set("view engine", "ejs");
@@ -111,9 +112,10 @@ if (!DATABASE_URL) {
 } else {
   const PgStore = PgSession(session);
 
+  const disableSsl = DATABASE_URL.includes("sslmode=disable") || DATABASE_URL.includes("localhost") || DATABASE_URL.includes("127.0.0.1");
   const pgPool = new Pool({
     connectionString: DATABASE_URL,
-    ssl: process.env.PGSSLMODE === "disable" ? false : { rejectUnauthorized: false }
+    ssl: disableSsl ? false : { rejectUnauthorized: false }
   });
 
   app.set("pgPool", pgPool);
@@ -132,7 +134,7 @@ if (!DATABASE_URL) {
       cookie: {
         httpOnly: true,
         sameSite: "lax",
-        secure: process.env.NODE_ENV === "production",
+        secure: false,
         maxAge: 1000 * 60 * 60 * 8
       }
     })
@@ -147,12 +149,11 @@ if (!DATABASE_URL) {
 
   /**
    * CSRF should not break API calls or health checks.
-   * Apply it only to non-API routes and ignore safe methods.
+   * Ignore safe methods; token is extracted from body, query, or headers by default.
    */
   app.use(
     csurf({
-      ignoreMethods: ["GET", "HEAD", "OPTIONS"],
-      value: (req) => req.csrfToken?.() // fallback safe; attachLocals will expose token when rendering
+      ignoreMethods: ["GET", "HEAD", "OPTIONS"]
     })
   );
 
