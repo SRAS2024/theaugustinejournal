@@ -106,7 +106,7 @@ if (!DATABASE_URL) {
       .send("Server is running, but DATABASE_URL is not configured. Add a Postgres service or set DATABASE_URL.");
   });
 
-  app.listen(PORT, () => {
+  app.listen(PORT, "0.0.0.0", () => {
     console.log(`The Augustine Journal running on port ${PORT} (DATABASE_URL missing)`);
   });
 } else {
@@ -171,7 +171,7 @@ if (!DATABASE_URL) {
     res.status(500).send("Something went wrong.");
   });
 
-  app.listen(PORT, () => {
+  app.listen(PORT, "0.0.0.0", () => {
     console.log(`The Augustine Journal running on port ${PORT}`);
   });
 }
