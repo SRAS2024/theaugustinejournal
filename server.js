@@ -24,7 +24,7 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 
-const PORT = 8080;
+const PORT = process.env.PORT || 8080;
 const SESSION_SECRET = crypto.randomBytes(32).toString("hex");
 const DATABASE_URL = process.env.DATABASE_URL;
 
