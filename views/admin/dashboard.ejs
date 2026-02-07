@@ -9,7 +9,7 @@
   <body>
     <header class="topbar">
       <div class="container header-inner">
-        <h1 class="brand">The Augustine Journal</h1>
+        <h1 class="brand"><a href="/admin/dashboard" style="color:inherit;text-decoration:none;">The Augustine Journal</a></h1>
         <nav class="admin-nav">
           <a href="/">View Site</a>
           <a href="/admin/dashboard" class="active">Dashboard</a>
@@ -39,6 +39,10 @@
           <div class="stat-card">
             <div class="stat-label">Blog Posts</div>
             <div class="stat-value"><%= blogCount %></div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Essays</div>
+            <div class="stat-value"><%= essayCount %></div>
           </div>
           <div class="stat-card">
             <div class="stat-label">Letters</div>
