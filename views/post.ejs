@@ -1,27 +1,41 @@
 <%
   function formatDate(d) {
     try {
-      return new Date(d).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' });
-    } catch(e) {
-      return '';
+      return new Date(d).toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" });
+    } catch (e) {
+      return "";
     }
   }
 
-  const typeLabel = post.type === 'BLOG' ? 'Blog' : 'Letter';
+  function typeLabelFor(t) {
+    if (t === "BLOG") return "Blog";
+    if (t === "ESSAY") return "Essays";
+    return "Letters";
+  }
+
+  const typeLabel = typeLabelFor(post.type);
+  const typeKey = post.type === "BLOG" ? "blog" : post.type === "ESSAY" ? "essays" : "letters";
 
   const body = `
     <section class="section card postShell">
       <div class="postHeader">
-        <h2>${post.title}</h2>
-        <div class="meta">${typeLabel} &mdash; ${formatDate(post.postDate)}</div>
+        <h2 data-translate="content" data-original="${String(post.title || "").replace(/"/g, "&quot;")}">${post.title}</h2>
+        <div class="meta">
+          <span data-i18n="${typeKey}">${typeLabel}</span>
+          <span> • ${formatDate(post.postDate)}</span>
+        </div>
       </div>
 
       <article class="postContent">
-        ${post.contentHtml || ''}
-        ${post.pdfPath ? `<p class="pdf-link"><a href="${post.pdfPath}" target="_blank" rel="noopener noreferrer">Open original PDF</a></p>` : ''}
+        ${post.contentHtml || ""}
+        ${
+          post.pdfPath
+            ? `<p class="pdf-link"><a href="${post.pdfPath}" target="_blank" rel="noopener noreferrer">Open original PDF</a></p>`
+            : ""
+        }
       </article>
     </section>
   `;
 %>
 
-<%- include("layout", { title: `${post.title} | The Augustine Journal`, active: post.type === 'BLOG' ? 'blog' : 'letters', body }) %>
+<%- include("layout", { title: `${post.title} | The Augustine Journal`, active: post.type === "BLOG" ? "blog" : post.type === "ESSAY" ? "essays" : "letters", body }) %>
