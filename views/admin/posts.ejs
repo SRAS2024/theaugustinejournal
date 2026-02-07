@@ -9,7 +9,7 @@
   <body>
     <header class="topbar">
       <div class="container header-inner">
-        <h1 class="brand">The Augustine Journal</h1>
+        <h1 class="brand"><a href="/admin/dashboard" style="color:inherit;text-decoration:none;">The Augustine Journal</a></h1>
         <nav class="admin-nav">
           <a href="/">View Site</a>
           <a href="/admin/dashboard">Dashboard</a>
@@ -34,6 +34,7 @@
         <div style="display:flex;justify-content:center;gap:8px;flex-wrap:wrap;margin-bottom:18px;">
           <a class="btn <%= filter === 'ALL' ? 'primary' : '' %>" href="/admin/posts?type=ALL">All</a>
           <a class="btn <%= filter === 'BLOG' ? 'primary' : '' %>" href="/admin/posts?type=BLOG">Blog</a>
+          <a class="btn <%= filter === 'ESSAY' ? 'primary' : '' %>" href="/admin/posts?type=ESSAY">Essays</a>
           <a class="btn <%= filter === 'LETTER' ? 'primary' : '' %>" href="/admin/posts?type=LETTER">Letters</a>
           <a class="btn primary" href="/admin/posts/new">Create Post</a>
         </div>
@@ -46,10 +47,12 @@
           <% (posts || []).forEach(function(p) { %>
             <div class="postRow">
               <div>
-                <div class="title" style="margin:0;"><a href="/post/<%= p.slug %>" target="_blank" rel="noopener noreferrer"><%= p.title %></a></div>
+                <div class="title" style="margin:0;">
+                  <a href="/post/<%= p.slug %>" target="_blank" rel="noopener noreferrer"><%= p.title %></a>
+                </div>
                 <div class="muted" style="margin-top:6px;font-size:12px;">
-                  <%= p.type === 'BLOG' ? 'Blog' : 'Letter' %> &middot;
-                  <%= new Date(p.postDate).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' }) %> &middot;
+                  <%= p.type === 'BLOG' ? 'Blog' : (p.type === 'ESSAY' ? 'Essay' : 'Letter') %> ·
+                  <%= new Date(p.postDate).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' }) %> ·
                   <%= p.contentType === 'PDF' ? 'PDF' : 'Editor' %>
                 </div>
               </div>
