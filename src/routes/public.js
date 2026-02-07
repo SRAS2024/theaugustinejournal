@@ -4,12 +4,24 @@ import { getPrisma } from "../lib/db.js";
 const router = Router();
 
 async function getCommon() {
-  const prisma = getPrisma();
-  const [settings, notices] = await Promise.all([
-    prisma.siteSettings.findUnique({ where: { id: 1 } }),
-    prisma.notice.findMany({ orderBy: { order: "asc" }, take: 3 })
-  ]);
-  return { settings, notices };
+  try {
+    const prisma = getPrisma();
+    const [settings, notices] = await Promise.all([
+      prisma.siteSettings.findUnique({ where: { id: 1 } }),
+      prisma.notice.findMany({ orderBy: { order: "asc" }, take: 3 })
+    ]);
+    return { settings, notices };
+  } catch (err) {
+    // P2021: table does not exist — can happen briefly before migrations finish
+    if (err?.code === "P2021") {
+      console.warn("[public] Table missing (P2021), returning safe defaults:", err.message);
+      return {
+        settings: { id: 1, aboutHtml: "", updatedAt: new Date() },
+        notices: []
+      };
+    }
+    throw err;
+  }
 }
 
 router.get("/", async (req, res, next) => {
