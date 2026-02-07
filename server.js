@@ -12,9 +12,6 @@ import { Pool } from "pg";
 import rateLimit from "express-rate-limit";
 import csurf from "csurf";
 
-import publicRoutes from "./src/routes/public.js";
-import adminRoutes from "./src/routes/admin.js";
-import apiRoutes from "./src/routes/api.js";
 import { attachLocals } from "./src/middleware/attachLocals.js";
 
 dotenv.config();
@@ -25,7 +22,10 @@ const __dirname = path.dirname(__filename);
 const app = express();
 
 const PORT = process.env.PORT || 8080;
-const SESSION_SECRET = crypto.randomBytes(32).toString("hex");
+
+// Prefer a stable secret across restarts in Railway.
+// Falls back to a random value only if not provided.
+const SESSION_SECRET = process.env.SESSION_SECRET || crypto.randomBytes(32).toString("hex");
 const DATABASE_URL = process.env.DATABASE_URL;
 
 app.set("view engine", "ejs");
@@ -95,7 +95,11 @@ app.get("/health", (req, res) => {
 
 /**
  * If DATABASE_URL is missing, do not hard exit.
- * Instead, serve a clear message so the service "responds" and you can fix env vars.
+ * Instead, serve a clear message so the service responds and you can fix env vars.
+ *
+ * IMPORTANT:
+ * Do not import DB backed routes before this check.
+ * Those modules can initialize Prisma at import time and crash the process.
  */
 if (!DATABASE_URL) {
   console.error("Missing DATABASE_URL. Set it in Railway environment variables.");
@@ -103,75 +107,103 @@ if (!DATABASE_URL) {
   app.get("*", (req, res) => {
     res
       .status(503)
-      .send("Server is running, but DATABASE_URL is not configured. Add a Postgres service or set DATABASE_URL.");
+      .send(
+        "Server is running, but DATABASE_URL is not configured. Add a Postgres service or set DATABASE_URL."
+      );
   });
 
   app.listen(PORT, "0.0.0.0", () => {
     console.log(`The Augustine Journal running on port ${PORT} (DATABASE_URL missing)`);
   });
 } else {
-  const PgStore = PgSession(session);
+  // Wrap startup in an async function so we can lazy import routes only after DB config is present.
+  const start = async () => {
+    const PgStore = PgSession(session);
 
-  const disableSsl = DATABASE_URL.includes("sslmode=disable") || DATABASE_URL.includes("localhost") || DATABASE_URL.includes("127.0.0.1");
-  const pgPool = new Pool({
-    connectionString: DATABASE_URL,
-    ssl: disableSsl ? false : { rejectUnauthorized: false }
-  });
+    const disableSsl =
+      DATABASE_URL.includes("sslmode=disable") ||
+      DATABASE_URL.includes("localhost") ||
+      DATABASE_URL.includes("127.0.0.1");
 
-  app.set("pgPool", pgPool);
+    const pgPool = new Pool({
+      connectionString: DATABASE_URL,
+      ssl: disableSsl ? false : { rejectUnauthorized: false }
+    });
 
-  app.use(
-    session({
-      store: new PgStore({
-        pool: pgPool,
-        tableName: "user_sessions",
-        createTableIfMissing: true
-      }),
-      name: "taj.sid",
-      secret: SESSION_SECRET,
-      resave: false,
-      saveUninitialized: false,
-      cookie: {
-        httpOnly: true,
-        sameSite: "lax",
-        secure: false,
-        maxAge: 1000 * 60 * 60 * 8
+    app.set("pgPool", pgPool);
+
+    app.use(
+      session({
+        store: new PgStore({
+          pool: pgPool,
+          tableName: "user_sessions",
+          createTableIfMissing: true
+        }),
+        name: "taj.sid",
+        secret: SESSION_SECRET,
+        resave: false,
+        saveUninitialized: false,
+        cookie: {
+          httpOnly: true,
+          sameSite: "lax",
+          secure: process.env.NODE_ENV === "production",
+          maxAge: 1000 * 60 * 60 * 8
+        }
+      })
+    );
+
+    app.use(
+      rateLimit({
+        windowMs: 60 * 1000,
+        max: 180
+      })
+    );
+
+    /**
+     * CSRF should not break API calls or health checks.
+     * Ignore safe methods; token is extracted from body, query, or headers by default.
+     */
+    app.use(
+      csurf({
+        ignoreMethods: ["GET", "HEAD", "OPTIONS"]
+      })
+    );
+
+    app.use(attachLocals);
+
+    // Lazy import routes so Prisma initialization cannot crash boot before we listen.
+    const [{ default: publicRoutes }, { default: adminRoutes }, { default: apiRoutes }] =
+      await Promise.all([
+        import("./src/routes/public.js"),
+        import("./src/routes/admin.js"),
+        import("./src/routes/api.js")
+      ]);
+
+    app.use("/", publicRoutes);
+    app.use("/admin", adminRoutes);
+    app.use("/api", apiRoutes);
+
+    app.use((err, req, res, next) => {
+      if (err?.code === "EBADCSRFTOKEN") {
+        return res.status(403).send("Security token mismatch. Please refresh and try again.");
       }
-    })
-  );
+      console.error(err);
+      res.status(500).send("Something went wrong.");
+    });
 
-  app.use(
-    rateLimit({
-      windowMs: 60 * 1000,
-      max: 180
-    })
-  );
+    app.listen(PORT, "0.0.0.0", () => {
+      console.log(`The Augustine Journal running on port ${PORT}`);
+    });
+  };
 
-  /**
-   * CSRF should not break API calls or health checks.
-   * Ignore safe methods; token is extracted from body, query, or headers by default.
-   */
-  app.use(
-    csurf({
-      ignoreMethods: ["GET", "HEAD", "OPTIONS"]
-    })
-  );
-
-  app.use(attachLocals);
-
-  app.use("/", publicRoutes);
-  app.use("/admin", adminRoutes);
-  app.use("/api", apiRoutes);
-
-  app.use((err, req, res, next) => {
-    if (err?.code === "EBADCSRFTOKEN") {
-      return res.status(403).send("Security token mismatch. Please refresh and try again.");
-    }
-    console.error(err);
-    res.status(500).send("Something went wrong.");
-  });
-
-  app.listen(PORT, "0.0.0.0", () => {
-    console.log(`The Augustine Journal running on port ${PORT}`);
+  start().catch((err) => {
+    console.error("Fatal boot error:", err);
+    // Ensure Railway still gets a response instead of a dead process.
+    app.get("*", (req, res) => {
+      res.status(500).send("Server failed to start due to a configuration error. Check logs.");
+    });
+    app.listen(PORT, "0.0.0.0", () => {
+      console.log(`The Augustine Journal running on port ${PORT} (boot error fallback)`);
+    });
   });
 }
