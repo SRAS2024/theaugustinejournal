@@ -12,10 +12,10 @@
       </div>
 
       <div class="latest">
-        <span class="label" data-i18n="seeLatest">See our latest post</span>
+        <span class="label" data-i18n="checkLatest">Check out our latest post</span>
         ${
           latest
-            ? `<a href="/post/${latest.slug}">${latest.title}</a>`
+            ? `<a href="/post/${latest.slug}" data-translate="content" data-original="${String(latest.title || "").replace(/"/g, "&quot;")}">${latest.title}</a>`
             : `<span class="muted" data-i18n="noPostsYet">No posts yet.</span>`
         }
       </div>
