@@ -22,6 +22,43 @@ async function main() {
       ]
     });
   }
+
+  const existingPosts = await prisma.post.count();
+  if (existingPosts === 0) {
+    const now = new Date();
+
+    await prisma.post.createMany({
+      data: [
+        {
+          id: nanoid(),
+          slug: "welcome-blog",
+          type: "BLOG",
+          title: "Welcome to the Blog",
+          postDate: now,
+          contentType: "RICH",
+          contentHtml: "<p>This is an example blog post. You can edit or delete it in the admin panel.</p>"
+        },
+        {
+          id: nanoid(),
+          slug: "welcome-essay",
+          type: "ESSAY",
+          title: "Welcome Essay",
+          postDate: now,
+          contentType: "RICH",
+          contentHtml: "<p>This is an example essay. Essays appear in their own section in the navigation.</p>"
+        },
+        {
+          id: nanoid(),
+          slug: "welcome-letter",
+          type: "LETTER",
+          title: "Welcome Letter",
+          postDate: now,
+          contentType: "RICH",
+          contentHtml: "<p>This is an example letter. Letters appear in their own section in the navigation.</p>"
+        }
+      ]
+    });
+  }
 }
 
 main()
