@@ -5,14 +5,15 @@
   "type": "module",
   "main": "server.js",
   "scripts": {
-    "build": "npx prisma generate",
+    "build": "prisma generate",
     "start": "node server.js",
     "dev": "node server.js",
+    "postinstall": "prisma generate",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate deploy",
     "prisma:studio": "prisma studio",
     "seed": "node prisma/seed.js",
-    "railway:db:setup": "npx prisma migrate deploy && node prisma/seed.js"
+    "railway:db:setup": "prisma migrate deploy && node prisma/seed.js"
   },
   "dependencies": {
     "@prisma/client": "^5.19.1",
