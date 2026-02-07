@@ -1,16 +1,17 @@
 (function () {
   /* ===== UI string translations ===== */
   var ui = {
-    home:      { en: "Home",    pt: "Inicio",   es: "Inicio",   fr: "Accueil",  de: "Startseite", it: "Home"      },
-    blog:      { en: "Blog",    pt: "Blog",     es: "Blog",     fr: "Blog",     de: "Blog",       it: "Blog"      },
-    letters:   { en: "Letters", pt: "Cartas",   es: "Cartas",   fr: "Lettres",  de: "Briefe",     it: "Lettere"   },
-    seeLatest: {
-      en: "See our latest post",
-      pt: "Veja nossa publicacao mais recente",
-      es: "Ver nuestra publicacion mas reciente",
-      fr: "Voir notre derniere publication",
-      de: "Sehen Sie unseren neuesten Beitrag",
-      it: "Vedi il nostro ultimo articolo"
+    home: { en: "Home", pt: "Inicio", es: "Inicio", fr: "Accueil", de: "Startseite", it: "Home" },
+    blog: { en: "Blog", pt: "Blog", es: "Blog", fr: "Blog", de: "Blog", it: "Blog" },
+    essays: { en: "Essays", pt: "Ensaios", es: "Ensayos", fr: "Essais", de: "Essays", it: "Saggi" },
+    letters: { en: "Letters", pt: "Cartas", es: "Cartas", fr: "Lettres", de: "Briefe", it: "Lettere" },
+    checkLatest: {
+      en: "Check out our latest post",
+      pt: "Confira nossa publicacao mais recente",
+      es: "Mira nuestra publicacion mas reciente",
+      fr: "Decouvrez notre derniere publication",
+      de: "Schauen Sie sich unseren neuesten Beitrag an",
+      it: "Dai un'occhiata al nostro ultimo articolo"
     },
     noPostsYet: {
       en: "No posts yet.",
@@ -58,7 +59,9 @@
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ text: original, targetLang: targetLang })
         })
-          .then(function (resp) { return resp.json(); })
+          .then(function (resp) {
+            return resp.json();
+          })
           .then(function (data) {
             if (data && data.used && typeof data.translatedText === "string") {
               node.textContent = data.translatedText;
@@ -80,12 +83,15 @@
     document.cookie = "googtrans=/en/" + lang + "; path=/; domain=." + host;
 
     window.googleTranslateElementInit = function () {
-      new google.translate.TranslateElement({
-        pageLanguage: "en",
-        includedLanguages: lang,
-        autoDisplay: false,
-        layout: google.translate.TranslateElement.InlineLayout.SIMPLE
-      }, "google_translate_element");
+      new google.translate.TranslateElement(
+        {
+          pageLanguage: "en",
+          includedLanguages: lang,
+          autoDisplay: false,
+          layout: google.translate.TranslateElement.InlineLayout.SIMPLE
+        },
+        "google_translate_element"
+      );
     };
 
     var script = document.createElement("script");
