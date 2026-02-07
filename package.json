@@ -5,8 +5,8 @@
   "type": "module",
   "main": "server.js",
   "scripts": {
-    "build": "prisma generate && prisma db push --skip-generate",
-    "start": "node server.js",
+    "build": "prisma generate",
+    "start": "prisma db push --skip-generate && node server.js",
     "dev": "node server.js",
     "postinstall": "prisma generate",
     "prisma:generate": "prisma generate",
