@@ -171,6 +171,27 @@ if (!DATABASE_URL) {
 
     app.use(attachLocals);
 
+    // ── Database bootstrap: run migrations + seed before mounting routes ──
+    const { bootstrap } = await import("./src/lib/db-bootstrap.js");
+    console.log("[startup] Beginning database bootstrap …");
+    const result = await bootstrap();
+
+    if (!result.ok) {
+      console.error("[startup] Bootstrap failed — serving error page instead of routes.");
+      app.use((req, res) => {
+        res.status(503).send(
+          "Database migrations failed. The site will be available once the database is ready. Check logs for details."
+        );
+      });
+
+      app.listen(PORT, "0.0.0.0", () => {
+        console.log(`The Augustine Journal running on port ${PORT} (migration-failure fallback)`);
+      });
+      return;
+    }
+
+    console.log("[startup] Bootstrap succeeded — mounting routes.");
+
     // Lazy import routes so Prisma initialization cannot crash boot before we listen.
     const [{ default: publicRoutes }, { default: adminRoutes }, { default: apiRoutes }] =
       await Promise.all([
@@ -182,6 +203,8 @@ if (!DATABASE_URL) {
     app.use("/", publicRoutes);
     app.use("/admin", adminRoutes);
     app.use("/api", apiRoutes);
+
+    console.log("[startup] Routes mounted successfully.");
 
     app.use((err, req, res, next) => {
       if (err?.code === "EBADCSRFTOKEN") {
