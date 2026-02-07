@@ -2,8 +2,7 @@ import { PrismaClient } from "@prisma/client";
 
 /**
  * Lazy, safe Prisma initialization.
- * This prevents the app from crashing at import time if DATABASE_URL is missing
- * or if Prisma cannot connect during boot.
+ * Keeps Prisma from being created at import time.
  */
 
 let prisma;
@@ -22,4 +21,14 @@ export function getPrisma() {
 
   prisma = new PrismaClient();
   return prisma;
+}
+
+/**
+ * Optional helper for graceful shutdown.
+ * Safe to call even if Prisma was never initialized.
+ */
+export async function disconnectPrisma() {
+  if (!prisma) return;
+  await prisma.$disconnect();
+  prisma = undefined;
 }
