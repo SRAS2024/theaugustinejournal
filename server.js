@@ -61,11 +61,7 @@ app.use(
           "https://*.gstatic.com"
         ],
         frameSrc: ["'self'", "https://translate.google.com"],
-        connectSrc: [
-          "'self'",
-          "https://translate.googleapis.com",
-          "https://translate-pa.googleapis.com"
-        ],
+        connectSrc: ["'self'", "https://translate.googleapis.com", "https://translate-pa.googleapis.com"],
         fontSrc: ["'self'", "https://fonts.gstatic.com", "https://fonts.googleapis.com"]
       }
     },
@@ -99,7 +95,6 @@ app.get("/health", (req, res) => {
  *
  * IMPORTANT:
  * Do not import DB backed routes before this check.
- * Those modules can initialize Prisma at import time and crash the process.
  */
 if (!DATABASE_URL) {
   console.error("Missing DATABASE_URL. Set it in Railway environment variables.");
@@ -116,7 +111,6 @@ if (!DATABASE_URL) {
     console.log(`The Augustine Journal running on port ${PORT} (DATABASE_URL missing)`);
   });
 } else {
-  // Wrap startup in an async function so we can lazy import routes only after DB config is present.
   const start = async () => {
     const PgStore = PgSession(session);
 
@@ -159,10 +153,6 @@ if (!DATABASE_URL) {
       })
     );
 
-    /**
-     * CSRF should not break API calls or health checks.
-     * Ignore safe methods; token is extracted from body, query, or headers by default.
-     */
     app.use(
       csurf({
         ignoreMethods: ["GET", "HEAD", "OPTIONS"]
@@ -171,13 +161,16 @@ if (!DATABASE_URL) {
 
     app.use(attachLocals);
 
-    // ── Database bootstrap: run migrations + seed before mounting routes ──
-    const { bootstrap } = await import("./src/lib/db-bootstrap.js");
-    console.log("[startup] Beginning database bootstrap …");
-    const result = await bootstrap();
+    // Database bootstrap: migrate and seed, with automatic baseline on P3005.
+    console.log("[startup] Beginning database bootstrap ...");
 
-    if (!result.ok) {
-      console.error("[startup] Bootstrap failed — serving error page instead of routes.");
+    try {
+      const { bootstrapDatabase } = await import("./src/lib/dbBootstrap.js");
+      const result = await bootstrapDatabase();
+      console.log("[startup] Bootstrap complete:", result);
+    } catch (e) {
+      console.error("[startup] Bootstrap failed:", e?.message || e);
+
       app.use((req, res) => {
         res.status(503).send(
           "Database migrations failed. The site will be available once the database is ready. Check logs for details."
@@ -190,9 +183,7 @@ if (!DATABASE_URL) {
       return;
     }
 
-    console.log("[startup] Bootstrap succeeded — mounting routes.");
-
-    // Lazy import routes so Prisma initialization cannot crash boot before we listen.
+    // Lazy import routes only after bootstrap succeeds.
     const [{ default: publicRoutes }, { default: adminRoutes }, { default: apiRoutes }] =
       await Promise.all([
         import("./src/routes/public.js"),
@@ -203,8 +194,6 @@ if (!DATABASE_URL) {
     app.use("/", publicRoutes);
     app.use("/admin", adminRoutes);
     app.use("/api", apiRoutes);
-
-    console.log("[startup] Routes mounted successfully.");
 
     app.use((err, req, res, next) => {
       if (err?.code === "EBADCSRFTOKEN") {
@@ -221,7 +210,6 @@ if (!DATABASE_URL) {
 
   start().catch((err) => {
     console.error("Fatal boot error:", err);
-    // Ensure Railway still gets a response instead of a dead process.
     app.get("*", (req, res) => {
       res.status(500).send("Server failed to start due to a configuration error. Check logs.");
     });
