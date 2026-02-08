@@ -71,12 +71,38 @@ function pdfTextToHtml(rawText) {
   if (!rawText || !rawText.trim()) {
     return "<p>PDF uploaded, but no selectable text was found.</p>";
   }
-  return rawText
-    .split(/\n\s*\n/)
-    .map((p) => p.trim())
-    .filter(Boolean)
-    .map((p) => `<p>${escapeHtml(p).replace(/\n/g, "<br>")}</p>`)
+
+  const blocks = rawText.split(/\n\s*\n/).filter((b) => b.trim());
+
+  const html = blocks
+    .map((block, i) => {
+      const trimmed = block.trim();
+      const lines = trimmed.split("\n");
+      const nextBlock = blocks[i + 1]?.trim();
+
+      // Detect heading: short block (1-2 lines, under 100 chars)
+      if (lines.length <= 2 && trimmed.length < 100) {
+        const isAllCaps = trimmed === trimmed.toUpperCase() && /[A-Z]{2,}/.test(trimmed);
+        if (isAllCaps) {
+          return `<h3>${escapeHtml(trimmed)}</h3>`;
+        }
+        // Short single line followed by a longer block → likely a subheading
+        if (lines.length === 1 && trimmed.length < 60 && nextBlock && nextBlock.length > trimmed.length * 2) {
+          return `<h4>${escapeHtml(trimmed)}</h4>`;
+        }
+      }
+
+      // Preserve original whitespace per line (indentation, alignment)
+      const escaped = block
+        .split("\n")
+        .map((line) => escapeHtml(line))
+        .join("\n");
+
+      return `<p>${escaped}</p>`;
+    })
     .join("\n");
+
+  return `<div class="pdf-text">${html}</div>`;
 }
 
 function deletePdfFile(pdfPath) {
