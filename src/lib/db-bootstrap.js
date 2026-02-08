@@ -9,22 +9,24 @@ import { Client } from "pg";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const projectRoot = path.resolve(__dirname, "../../");
+const PROJECT_ROOT = path.resolve(__dirname, "../../");
+
+const EXPECTED_TABLES = ["SiteSettings", "Notice", "Post"];
+
+/* ------------------------------------------------------------------ */
+/*  Helpers                                                           */
+/* ------------------------------------------------------------------ */
 
 function prismaCommand() {
   if (process.env.PRISMA_CLI_CMD) return process.env.PRISMA_CLI_CMD;
-
-  const binName = process.platform === "win32" ? "prisma.cmd" : "prisma";
-  const local = path.join(projectRoot, "node_modules", ".bin", binName);
-
-  if (fs.existsSync(local)) return local;
-
-  return "npx prisma";
+  const bin = process.platform === "win32" ? "prisma.cmd" : "prisma";
+  const local = path.join(PROJECT_ROOT, "node_modules", ".bin", bin);
+  return fs.existsSync(local) ? local : "npx prisma";
 }
 
 function run(command) {
   return execSync(command, {
-    cwd: projectRoot,
+    cwd: PROJECT_ROOT,
     env: { ...process.env },
     stdio: "pipe",
     shell: true
@@ -32,99 +34,113 @@ function run(command) {
 }
 
 function sslForUrl(url) {
-  const disable =
-    url.includes("sslmode=disable") || url.includes("localhost") || url.includes("127.0.0.1");
-  return disable ? false : { rejectUnauthorized: false };
+  if (url.includes("sslmode=disable") || url.includes("localhost") || url.includes("127.0.0.1")) {
+    return false;
+  }
+  return { rejectUnauthorized: false };
 }
 
-async function expectedTablesExist() {
+/* ------------------------------------------------------------------ */
+/*  Schema readiness check                                            */
+/* ------------------------------------------------------------------ */
+
+export async function expectedTablesExist() {
   const url = process.env.DATABASE_URL;
   if (!url) return false;
 
   const client = new Client({ connectionString: url, ssl: sslForUrl(url) });
   try {
     await client.connect();
-    const expected = ["SiteSettings", "Notice", "Post"];
-    const r = await client.query(
-      `
-      select table_name
-      from information_schema.tables
-      where table_schema = 'public'
-        and table_name = any($1::text[])
-      `,
-      [expected]
+    const result = await client.query(
+      `SELECT table_name FROM information_schema.tables
+       WHERE table_schema = 'public' AND table_name = ANY($1::text[])`,
+      [EXPECTED_TABLES]
     );
-    const found = new Set(r.rows.map((x) => x.table_name));
-    return expected.every((t) => found.has(t));
+    const found = new Set(result.rows.map((r) => r.table_name));
+    const allExist = EXPECTED_TABLES.every((t) => found.has(t));
+    if (!allExist) {
+      const missing = EXPECTED_TABLES.filter((t) => !found.has(t));
+      console.log(`[bootstrap] Missing tables: ${missing.join(", ")}`);
+    }
+    return allExist;
   } catch {
     return false;
   } finally {
-    try {
-      await client.end();
-    } catch {}
+    try { await client.end(); } catch { /* ignore */ }
   }
 }
 
-/**
- * Runs migrations. If they "succeed" but the expected tables are still missing,
- * it automatically falls back to `prisma db push` to create the schema from schema.prisma.
- *
- * This avoids reliance on the migrations folder being present in the deployed container.
- */
-export async function runMigrations() {
+/* ------------------------------------------------------------------ */
+/*  Migration with db push fallback                                   */
+/* ------------------------------------------------------------------ */
+
+async function ensureSchema() {
   const prisma = prismaCommand();
 
+  // Step 1: Try prisma migrate deploy
   try {
     console.log("[bootstrap] Running prisma migrate deploy ...");
     const out = run(`${prisma} migrate deploy`);
     if (out?.trim()) console.log(out.trim());
-    console.log("[bootstrap] migrate deploy exited successfully.");
-
-    const okAfterDeploy = await expectedTablesExist();
-    if (okAfterDeploy) {
-      console.log("[bootstrap] Expected tables exist after migrate deploy.");
-      return { ok: true, baselined: false, createdViaPush: false };
-    }
-
-    console.log("[bootstrap] Tables missing after deploy. Running prisma db push fallback ...");
-    const pushOut = run(`${prisma} db push --skip-generate`);
-    if (pushOut?.trim()) console.log(pushOut.trim());
-
-    const okAfterPush = await expectedTablesExist();
-    if (!okAfterPush) {
-      const msg =
-        "Schema tables are missing after migrate deploy and db push. Verify DATABASE_URL points to the intended database.";
-      console.error("[bootstrap]", msg);
-      return { ok: false, error: msg, createdViaPush: true };
-    }
-
-    console.log("[bootstrap] Tables created via db push fallback.");
-    return { ok: true, baselined: false, createdViaPush: true };
   } catch (err) {
-    const stdout = err?.stdout ? err.stdout.toString() : "";
-    const stderr = err?.stderr ? err.stderr.toString() : "";
-    const combined = `${stdout}\n${stderr}`.trim();
-    const msg = combined || err?.message || String(err);
-    console.error("[bootstrap] Migration failed:", msg);
-    return { ok: false, error: msg };
+    const stderr = err?.stderr?.toString() || "";
+    const stdout = err?.stdout?.toString() || "";
+    console.warn("[bootstrap] migrate deploy failed:", (stdout + "\n" + stderr).trim() || err.message);
   }
+
+  if (await expectedTablesExist()) {
+    console.log("[bootstrap] Schema verified after migrate deploy.");
+    return;
+  }
+
+  // Step 2: Fallback to prisma db push
+  console.log("[bootstrap] Tables missing after migrate deploy. Running prisma db push --skip-generate ...");
+  try {
+    const out = run(`${prisma} db push --skip-generate`);
+    if (out?.trim()) console.log(out.trim());
+  } catch (err) {
+    const stderr = err?.stderr?.toString() || "";
+    const stdout = err?.stdout?.toString() || "";
+    const msg = (stdout + "\n" + stderr).trim() || err.message;
+    throw new Error(`prisma db push failed: ${msg}`);
+  }
+
+  // Step 3: Final verification
+  if (await expectedTablesExist()) {
+    console.log("[bootstrap] Schema verified after db push fallback.");
+    return;
+  }
+
+  throw new Error(
+    "Schema tables (SiteSettings, Notice, Post) are still missing after migrate deploy and db push. " +
+    "Verify DATABASE_URL points to the intended database."
+  );
 }
 
-export async function runSeed() {
+/* ------------------------------------------------------------------ */
+/*  Idempotent seed                                                   */
+/* ------------------------------------------------------------------ */
+
+async function runSeed() {
   const prisma = new PrismaClient();
   try {
     console.log("[bootstrap] Running startup seed ...");
 
+    // Upsert singleton site settings (never overwrites user edits)
     await prisma.siteSettings.upsert({
       where: { id: 1 },
       update: {},
       create: {
         id: 1,
         aboutHtml:
-          "<p>The Augustine Journal is a publication dedicated to thoughtful reflection and discourse. Founded on the principles of truth, wisdom, and intellectual inquiry, we seek to engage readers through carefully curated essays, letters, and commentary on the matters that shape our understanding of the world.</p>"
+          "<p>The Augustine Journal is a publication dedicated to thoughtful reflection and discourse. " +
+          "Founded on the principles of truth, wisdom, and intellectual inquiry, we seek to engage readers " +
+          "through carefully curated essays, letters, and commentary on the matters that shape our " +
+          "understanding of the world.</p>"
       }
     });
 
+    // Create a starter notice only if none exist
     const noticeCount = await prisma.notice.count();
     if (noticeCount === 0) {
       await prisma.notice.create({
@@ -142,17 +158,16 @@ export async function runSeed() {
   }
 }
 
-export async function bootstrap() {
-  const migration = await runMigrations();
-  if (!migration.ok) {
-    throw new Error(migration.error || "Database migrations failed.");
-  }
+/* ------------------------------------------------------------------ */
+/*  Bootstrap entry point                                             */
+/* ------------------------------------------------------------------ */
 
+export async function bootstrap() {
+  // 1. Ensure schema tables exist (migrate → db push fallback → throw)
+  await ensureSchema();
+
+  // 2. Seed only after schema is confirmed ready
   await runSeed();
 
-  return {
-    ok: true,
-    baselined: migration.baselined === true,
-    createdViaPush: migration.createdViaPush === true
-  };
+  return { ok: true };
 }

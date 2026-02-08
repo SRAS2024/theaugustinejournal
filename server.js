@@ -23,12 +23,19 @@ const __dirname = path.dirname(__filename);
 const app = express();
 
 const PORT = process.env.PORT || 8080;
-
 const SESSION_SECRET = process.env.SESSION_SECRET || crypto.randomBytes(32).toString("hex");
 const DATABASE_URL = process.env.DATABASE_URL;
 
+/* ------------------------------------------------------------------ */
+/*  View engine                                                       */
+/* ------------------------------------------------------------------ */
+
 app.set("view engine", "ejs");
 app.set("views", path.join(__dirname, "views"));
+
+/* ------------------------------------------------------------------ */
+/*  Security headers                                                  */
+/* ------------------------------------------------------------------ */
 
 app.use(
   helmet({
@@ -69,8 +76,11 @@ app.use(
   })
 );
 
-app.use(morgan("combined"));
+/* ------------------------------------------------------------------ */
+/*  Common middleware                                                  */
+/* ------------------------------------------------------------------ */
 
+app.use(morgan("combined"));
 app.use(express.json({ limit: "1mb" }));
 app.use(express.urlencoded({ extended: true, limit: "2mb" }));
 app.use(cookieParser());
@@ -80,139 +90,152 @@ app.use("/uploads", express.static(path.join(__dirname, "uploads"), { fallthroug
 
 app.set("trust proxy", 1);
 
-app.get("/health", (req, res) => {
+/* ------------------------------------------------------------------ */
+/*  Health check (always available)                                   */
+/* ------------------------------------------------------------------ */
+
+app.get("/health", (_req, res) => {
   res.status(200).send("ok");
 });
 
-if (!DATABASE_URL) {
-  console.error("Missing DATABASE_URL. Set it in Railway environment variables.");
+/* ------------------------------------------------------------------ */
+/*  503 fallback — used when the database is not ready                */
+/* ------------------------------------------------------------------ */
 
-  app.get("*", (req, res) => {
-    res
-      .status(503)
-      .send(
-        "Server is running, but DATABASE_URL is not configured. Add a Postgres service or set DATABASE_URL."
-      );
+function serve503(message) {
+  app.use((req, res, _next) => {
+    if (req.path === "/health") return; // already handled above
+    res.status(503).send(message);
   });
 
   app.listen(PORT, "0.0.0.0", () => {
-    console.log(`The Augustine Journal running on port ${PORT} (DATABASE_URL missing)`);
+    console.log(`The Augustine Journal running on port ${PORT} (503 fallback)`);
   });
+}
+
+/* ------------------------------------------------------------------ */
+/*  Start                                                             */
+/* ------------------------------------------------------------------ */
+
+if (!DATABASE_URL) {
+  console.error("[startup] DATABASE_URL is not set.");
+  serve503(
+    "Server is running, but DATABASE_URL is not configured. " +
+    "Add a Postgres service or set DATABASE_URL."
+  );
 } else {
-  const start = async () => {
-    const PgStore = PgSession(session);
+  start().catch((err) => {
+    console.error("[startup] Fatal boot error:", err);
+    serve503("Server failed to start due to a configuration error. Check logs.");
+  });
+}
 
-    const disableSsl =
-      DATABASE_URL.includes("sslmode=disable") ||
-      DATABASE_URL.includes("localhost") ||
-      DATABASE_URL.includes("127.0.0.1");
+async function start() {
+  /* ---------- Session store ---------- */
 
-    const pgPool = new Pool({
-      connectionString: DATABASE_URL,
-      ssl: disableSsl ? false : { rejectUnauthorized: false }
-    });
+  const PgStore = PgSession(session);
 
-    app.set("pgPool", pgPool);
+  const disableSsl =
+    DATABASE_URL.includes("sslmode=disable") ||
+    DATABASE_URL.includes("localhost") ||
+    DATABASE_URL.includes("127.0.0.1");
 
-    app.use(
-      session({
-        store: new PgStore({
-          pool: pgPool,
-          tableName: "user_sessions",
-          createTableIfMissing: true
-        }),
-        name: "taj.sid",
-        secret: SESSION_SECRET,
-        resave: false,
-        saveUninitialized: false,
-        cookie: {
-          httpOnly: true,
-          sameSite: "lax",
-          secure: process.env.NODE_ENV === "production",
-          maxAge: 1000 * 60 * 60 * 8
-        }
-      })
+  const pgPool = new Pool({
+    connectionString: DATABASE_URL,
+    ssl: disableSsl ? false : { rejectUnauthorized: false }
+  });
+
+  app.set("pgPool", pgPool);
+
+  app.use(
+    session({
+      store: new PgStore({
+        pool: pgPool,
+        tableName: "user_sessions",
+        createTableIfMissing: true
+      }),
+      name: "taj.sid",
+      secret: SESSION_SECRET,
+      resave: false,
+      saveUninitialized: false,
+      cookie: {
+        httpOnly: true,
+        sameSite: "lax",
+        secure: process.env.NODE_ENV === "production",
+        maxAge: 1000 * 60 * 60 * 8
+      }
+    })
+  );
+
+  /* ---------- Rate limiting ---------- */
+
+  app.use(
+    rateLimit({
+      windowMs: 60 * 1000,
+      max: 180
+    })
+  );
+
+  /* ---------- CSRF ---------- */
+
+  app.use(
+    csurf({
+      ignoreMethods: ["GET", "HEAD", "OPTIONS"]
+    })
+  );
+
+  app.use(attachLocals);
+
+  /* ---------- Database bootstrap ---------- */
+
+  console.log("[startup] Beginning database bootstrap ...");
+
+  try {
+    const { bootstrap } = await import("./src/lib/db-bootstrap.js");
+    const result = await bootstrap();
+    console.log("[startup] Bootstrap complete:", result);
+  } catch (e) {
+    const msg = (e?.message || String(e) || "").slice(0, 2000);
+    console.error("[startup] Bootstrap failed:", msg);
+
+    // Keep process alive for Railway health checks but refuse all other traffic.
+    serve503(
+      "Database bootstrap failed. The site will be available once the database schema is ready.\n\n" + msg
     );
+    return;
+  }
 
-    app.use(
-      rateLimit({
-        windowMs: 60 * 1000,
-        max: 180
-      })
-    );
+  /* ---------- Mount routes (only after schema is verified) ---------- */
 
-    app.use(
-      csurf({
-        ignoreMethods: ["GET", "HEAD", "OPTIONS"]
-      })
-    );
+  const [{ default: publicRoutes }, { default: adminRoutes }, { default: apiRoutes }] =
+    await Promise.all([
+      import("./src/routes/public.js"),
+      import("./src/routes/admin.js"),
+      import("./src/routes/api.js")
+    ]);
 
-    app.use(attachLocals);
+  app.use("/", publicRoutes);
+  app.use("/admin", adminRoutes);
+  app.use("/api", apiRoutes);
 
-    console.log("[startup] Beginning database bootstrap ...");
+  /* ---------- Global error handler ---------- */
 
-    try {
-      const { bootstrap } = await import("./src/lib/db-bootstrap.js");
-      const result = await bootstrap();
-      console.log("[startup] Bootstrap complete:", result);
-    } catch (e) {
-      const msg = (e?.message || String(e) || "").slice(0, 2000);
-      console.error("[startup] Bootstrap failed:", msg);
-
-      app.get("/", (req, res) => {
-        res.status(503).send(
-          `Database bootstrap failed. This is usually a schema or migration issue.\n\n${msg}`
-        );
-      });
-
-      app.get("*", (req, res) => {
-        res.status(503).send(
-          "Database migrations failed. The site will be available once the database is ready. Check logs for details."
-        );
-      });
-
-      app.listen(PORT, "0.0.0.0", () => {
-        console.log(`The Augustine Journal running on port ${PORT} (migration-failure fallback)`);
-      });
-      return;
+  app.use((err, _req, res, _next) => {
+    if (err?.code === "EBADCSRFTOKEN") {
+      return res.status(403).send("Security token mismatch. Please refresh and try again.");
     }
 
-    const [{ default: publicRoutes }, { default: adminRoutes }, { default: apiRoutes }] =
-      await Promise.all([
-        import("./src/routes/public.js"),
-        import("./src/routes/admin.js"),
-        import("./src/routes/api.js")
-      ]);
+    if (err?.code === "P2021") {
+      return res.status(503).send("Database schema is not ready yet. Please refresh in a moment.");
+    }
 
-    app.use("/", publicRoutes);
-    app.use("/admin", adminRoutes);
-    app.use("/api", apiRoutes);
+    console.error(err);
+    res.status(500).send("Something went wrong.");
+  });
 
-    app.use((err, req, res, next) => {
-      if (err?.code === "EBADCSRFTOKEN") {
-        return res.status(403).send("Security token mismatch. Please refresh and try again.");
-      }
+  /* ---------- Listen ---------- */
 
-      if (err?.code === "P2021") {
-        return res.status(503).send("Database schema is not ready yet. Please refresh in a moment.");
-      }
-
-      console.error(err);
-      res.status(500).send("Something went wrong.");
-    });
-
-    app.listen(PORT, "0.0.0.0", () => {
-      console.log(`The Augustine Journal running on port ${PORT}`);
-    });
-  };
-
-  start().catch((err) => {
-    console.error("Fatal boot error:", err);
-    app.get("*", (req, res) => {
-      res.status(500).send("Server failed to start due to a configuration error. Check logs.");
-    });
-    app.listen(PORT, "0.0.0.0", () => {
-      console.log(`The Augustine Journal running on port ${PORT} (boot error fallback)`);
-    });
+  app.listen(PORT, "0.0.0.0", () => {
+    console.log(`The Augustine Journal running on port ${PORT}`);
   });
 }
