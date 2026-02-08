@@ -9,17 +9,26 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const projectRoot = path.resolve(__dirname, "../../");
 
-function prismaBinary() {
+function prismaCommand() {
+  // Allow an override if you ever need it in Railway vars
+  if (process.env.PRISMA_CLI_CMD) return process.env.PRISMA_CLI_CMD;
+
   const binName = process.platform === "win32" ? "prisma.cmd" : "prisma";
   const local = path.join(projectRoot, "node_modules", ".bin", binName);
-  return fs.existsSync(local) ? local : "prisma";
+
+  // Prefer local install (best and fastest)
+  if (fs.existsSync(local)) return local;
+
+  // Fallback: use npx (helps if prisma is not installed in production deps)
+  return process.platform === "win32" ? "npx prisma" : "npx prisma";
 }
 
 function run(command) {
   return execSync(command, {
     cwd: projectRoot,
     env: { ...process.env },
-    stdio: "pipe"
+    stdio: "pipe",
+    shell: true
   }).toString();
 }
 
@@ -42,11 +51,11 @@ function listMigrationNames() {
  * Returns { ok: boolean, baselined?: boolean, error?: string }
  */
 export async function runMigrations() {
-  const prisma = prismaBinary();
+  const prisma = prismaCommand();
 
   try {
-    console.log("[bootstrap] Running prisma migrate deploy …");
-    run(`"${prisma}" migrate deploy`);
+    console.log("[bootstrap] Running prisma migrate deploy ...");
+    run(`${prisma} migrate deploy`);
     console.log("[bootstrap] Migrations applied successfully.");
     return { ok: true, baselined: false };
   } catch (err) {
@@ -55,7 +64,7 @@ export async function runMigrations() {
     const combined = `${stdout}\n${stderr}`.trim();
 
     if (combined.includes("P3005")) {
-      console.log("[bootstrap] Detected P3005, baselining existing database …");
+      console.log("[bootstrap] Detected P3005, baselining existing database ...");
 
       const migrations = listMigrationNames();
       if (!migrations.length) {
@@ -67,11 +76,11 @@ export async function runMigrations() {
       try {
         for (const name of migrations) {
           console.log(`[bootstrap] Marking migration as applied: ${name}`);
-          run(`"${prisma}" migrate resolve --applied "${name}"`);
+          run(`${prisma} migrate resolve --applied "${name}"`);
         }
 
-        console.log("[bootstrap] Baseline complete. Re-running migrate deploy …");
-        run(`"${prisma}" migrate deploy`);
+        console.log("[bootstrap] Baseline complete. Re-running migrate deploy ...");
+        run(`${prisma} migrate deploy`);
         console.log("[bootstrap] Migrations ready after baseline.");
         return { ok: true, baselined: true };
       } catch (e2) {
@@ -98,7 +107,7 @@ export async function runMigrations() {
 export async function runSeed() {
   const prisma = new PrismaClient();
   try {
-    console.log("[bootstrap] Running startup seed …");
+    console.log("[bootstrap] Running startup seed ...");
 
     await prisma.siteSettings.upsert({
       where: { id: 1 },
@@ -130,11 +139,15 @@ export async function runSeed() {
 /**
  * Full bootstrap: migrate then seed.
  * Returns { ok: boolean, baselined?: boolean, error?: string }
+ *
+ * IMPORTANT:
+ * If migrations fail, throw so server.js enters the 503 fallback instead of
+ * continuing to load routes against a broken schema.
  */
 export async function bootstrap() {
   const migration = await runMigrations();
   if (!migration.ok) {
-    return migration;
+    throw new Error(migration.error || "Database migrations failed.");
   }
 
   try {
