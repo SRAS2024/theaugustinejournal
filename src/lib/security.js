@@ -1,6 +1,6 @@
 import bcrypt from "bcryptjs";
 
-const ADMIN_USERNAME = "SRAS0920";
+const ADMIN_USERNAME = "Ryan Simonds";
 const ADMIN_PASSWORD = "Santidade";
 
 export function isValidAdminUser(username) {
