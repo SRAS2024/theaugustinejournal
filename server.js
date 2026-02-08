@@ -1,3 +1,4 @@
+// server.js
 import crypto from "crypto";
 import express from "express";
 import path from "path";
@@ -23,8 +24,6 @@ const app = express();
 
 const PORT = process.env.PORT || 8080;
 
-// Prefer a stable secret across restarts in Railway.
-// Falls back to a random value only if not provided.
 const SESSION_SECRET = process.env.SESSION_SECRET || crypto.randomBytes(32).toString("hex");
 const DATABASE_URL = process.env.DATABASE_URL;
 
@@ -81,21 +80,10 @@ app.use("/uploads", express.static(path.join(__dirname, "uploads"), { fallthroug
 
 app.set("trust proxy", 1);
 
-/**
- * Health check endpoint
- * Railway will mark the service unhealthy if it cannot get a quick response.
- */
 app.get("/health", (req, res) => {
   res.status(200).send("ok");
 });
 
-/**
- * If DATABASE_URL is missing, do not hard exit.
- * Instead, serve a clear message so the service responds and you can fix env vars.
- *
- * IMPORTANT:
- * Do not import DB backed routes before this check.
- */
 if (!DATABASE_URL) {
   console.error("Missing DATABASE_URL. Set it in Railway environment variables.");
 
@@ -161,19 +149,23 @@ if (!DATABASE_URL) {
 
     app.use(attachLocals);
 
-    // Database bootstrap: migrate and seed, with automatic baseline on P3005.
     console.log("[startup] Beginning database bootstrap ...");
 
     try {
-      // The file in your repo is named db-bootstrap.js (Linux is case sensitive)
-      // and it exports bootstrap(), not bootstrapDatabase().
       const { bootstrap } = await import("./src/lib/db-bootstrap.js");
       const result = await bootstrap();
       console.log("[startup] Bootstrap complete:", result);
     } catch (e) {
-      console.error("[startup] Bootstrap failed:", e?.message || e);
+      const msg = (e?.message || String(e) || "").slice(0, 2000);
+      console.error("[startup] Bootstrap failed:", msg);
 
-      app.use((req, res) => {
+      app.get("/", (req, res) => {
+        res.status(503).send(
+          `Database bootstrap failed. This is usually a schema or migration issue.\n\n${msg}`
+        );
+      });
+
+      app.get("*", (req, res) => {
         res.status(503).send(
           "Database migrations failed. The site will be available once the database is ready. Check logs for details."
         );
@@ -185,7 +177,6 @@ if (!DATABASE_URL) {
       return;
     }
 
-    // Lazy import routes only after bootstrap succeeds.
     const [{ default: publicRoutes }, { default: adminRoutes }, { default: apiRoutes }] =
       await Promise.all([
         import("./src/routes/public.js"),
@@ -201,6 +192,11 @@ if (!DATABASE_URL) {
       if (err?.code === "EBADCSRFTOKEN") {
         return res.status(403).send("Security token mismatch. Please refresh and try again.");
       }
+
+      if (err?.code === "P2021") {
+        return res.status(503).send("Database schema is not ready yet. Please refresh in a moment.");
+      }
+
       console.error(err);
       res.status(500).send("Something went wrong.");
     });
