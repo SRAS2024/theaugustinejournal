@@ -165,8 +165,10 @@ if (!DATABASE_URL) {
     console.log("[startup] Beginning database bootstrap ...");
 
     try {
-      const { bootstrapDatabase } = await import("./src/lib/dbBootstrap.js");
-      const result = await bootstrapDatabase();
+      // The file in your repo is named db-bootstrap.js (Linux is case sensitive)
+      // and it exports bootstrap(), not bootstrapDatabase().
+      const { bootstrap } = await import("./src/lib/db-bootstrap.js");
+      const result = await bootstrap();
       console.log("[startup] Bootstrap complete:", result);
     } catch (e) {
       console.error("[startup] Bootstrap failed:", e?.message || e);
