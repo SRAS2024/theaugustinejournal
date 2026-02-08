@@ -94,9 +94,12 @@ async function ensureSchema() {
   }
 
   // Step 2: Fallback to prisma db push
-  console.log("[bootstrap] Tables missing after migrate deploy. Running prisma db push --skip-generate ...");
+  // --accept-data-loss is required because non-Prisma tables (e.g. user_sessions
+  // created by connect-pg-simple) would otherwise block the push. The session
+  // table is auto-recreated on every startup via createTableIfMissing: true.
+  console.log("[bootstrap] Tables missing after migrate deploy. Running prisma db push --skip-generate --accept-data-loss ...");
   try {
-    const out = run(`${prisma} db push --skip-generate`);
+    const out = run(`${prisma} db push --skip-generate --accept-data-loss`);
     if (out?.trim()) console.log(out.trim());
   } catch (err) {
     const stderr = err?.stderr?.toString() || "";
