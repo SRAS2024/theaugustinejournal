@@ -38,6 +38,40 @@ const upload = multer({
 
 const ALLOWED_POST_TYPES = ["BLOG", "ESSAY", "LETTER"];
 
+function isTableMissingError(err) {
+  return err?.code === "P2021";
+}
+
+function escapeHtml(str) {
+  return String(str)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+function makeSlug(title) {
+  const base = slugify(title, { lower: true, strict: true });
+  return base.length ? `${base}` : nanoid(10);
+}
+
+function pdfTextToHtml(rawText) {
+  if (!rawText || !rawText.trim()) {
+    return "<p>PDF uploaded, but no selectable text was found.</p>";
+  }
+  const paragraphs = rawText.split(/\n\s*\n/);
+  return paragraphs
+    .map((p) => {
+      const trimmed = p.trim();
+      if (!trimmed) return "";
+      const escaped = escapeHtml(trimmed).replace(/\n/g, "<br>");
+      return `<p>${escaped}</p>`;
+    })
+    .filter((p) => p.length > 0)
+    .join("\n");
+}
+
 router.get("/", requireAdmin, (req, res) => res.redirect("/admin/dashboard"));
 
 router.get("/login", (req, res) => {
@@ -94,6 +128,19 @@ router.get("/dashboard", requireAdmin, async (req, res, next) => {
       saved
     });
   } catch (err) {
+    if (isTableMissingError(err)) {
+      const saved = req.query.saved === "true";
+      return res.render("admin/dashboard", {
+        settings: { id: 1, aboutHtml: "", updatedAt: new Date() },
+        notices: [],
+        postCount: 0,
+        blogCount: 0,
+        essayCount: 0,
+        letterCount: 0,
+        saved,
+        error: ""
+      });
+    }
     next(err);
   }
 });
@@ -110,6 +157,15 @@ router.get("/settings", requireAdmin, async (req, res, next) => {
     const saved = req.query.saved === "true";
     res.render("admin/edit-settings", { settings, notices, error: "", saved });
   } catch (err) {
+    if (isTableMissingError(err)) {
+      const saved = req.query.saved === "true";
+      return res.render("admin/edit-settings", {
+        settings: { id: 1, aboutHtml: "", updatedAt: new Date() },
+        notices: [],
+        error: "",
+        saved
+      });
+    }
     next(err);
   }
 });
@@ -127,6 +183,11 @@ router.post("/settings", requireAdmin, async (req, res, next) => {
 
     res.redirect("/admin/settings?saved=true");
   } catch (err) {
+    if (isTableMissingError(err)) {
+      return res
+        .status(503)
+        .send("Database schema is not ready yet. Please refresh in a moment.");
+    }
     next(err);
   }
 });
@@ -147,6 +208,11 @@ router.post("/notices/add", requireAdmin, async (req, res, next) => {
 
     res.redirect("/admin/settings?saved=true");
   } catch (err) {
+    if (isTableMissingError(err)) {
+      return res
+        .status(503)
+        .send("Database schema is not ready yet. Please refresh in a moment.");
+    }
     next(err);
   }
 });
@@ -161,6 +227,11 @@ router.post("/notices/:id/update", requireAdmin, async (req, res, next) => {
     });
     res.redirect("/admin/settings?saved=true");
   } catch (err) {
+    if (isTableMissingError(err)) {
+      return res
+        .status(503)
+        .send("Database schema is not ready yet. Please refresh in a moment.");
+    }
     next(err);
   }
 });
@@ -178,6 +249,11 @@ router.post("/notices/:id/delete", requireAdmin, async (req, res, next) => {
 
     res.redirect("/admin/settings?saved=true");
   } catch (err) {
+    if (isTableMissingError(err)) {
+      return res
+        .status(503)
+        .send("Database schema is not ready yet. Please refresh in a moment.");
+    }
     next(err);
   }
 });
@@ -204,6 +280,10 @@ router.get("/posts", requireAdmin, async (req, res, next) => {
     const saved = req.query.saved === "true";
     res.render("admin/posts", { posts, filter: type, saved });
   } catch (err) {
+    if (isTableMissingError(err)) {
+      const saved = req.query.saved === "true";
+      return res.render("admin/posts", { posts: [], filter: String(req.query.type || "ALL"), saved });
+    }
     next(err);
   }
 });
@@ -229,30 +309,12 @@ router.get("/posts/:id/edit", requireAdmin, async (req, res, next) => {
       error: ""
     });
   } catch (err) {
+    if (isTableMissingError(err)) {
+      return res.status(503).send("Database schema is not ready yet. Please refresh in a moment.");
+    }
     next(err);
   }
 });
-
-function makeSlug(title) {
-  const base = slugify(title, { lower: true, strict: true });
-  return base.length ? `${base}` : nanoid(10);
-}
-
-function pdfTextToHtml(rawText) {
-  if (!rawText || !rawText.trim()) {
-    return "<p>PDF uploaded, but no selectable text was found.</p>";
-  }
-  const paragraphs = rawText.split(/\n\s*\n/);
-  return paragraphs
-    .map((p) => {
-      const trimmed = p.trim();
-      if (!trimmed) return "";
-      const escaped = escapeHtml(trimmed).replace(/\n/g, "<br>");
-      return `<p>${escaped}</p>`;
-    })
-    .filter((p) => p.length > 0)
-    .join("\n");
-}
 
 router.post("/posts/create", requireAdmin, upload.single("pdfFile"), async (req, res) => {
   const prisma = getPrisma();
@@ -278,7 +340,6 @@ router.post("/posts/create", requireAdmin, upload.single("pdfFile"), async (req,
       });
     }
 
-    // Automatically date posts if missing.
     const postDate = postDateRaw ? new Date(postDateRaw) : new Date();
     if (Number.isNaN(postDate.getTime())) {
       return res.status(400).render("admin/post-form", {
@@ -344,6 +405,11 @@ router.post("/posts/create", requireAdmin, upload.single("pdfFile"), async (req,
 
     res.redirect("/admin/posts?saved=true");
   } catch (e) {
+    if (isTableMissingError(e)) {
+      return res
+        .status(503)
+        .send("Database schema is not ready yet. Please refresh in a moment.");
+    }
     console.error(e);
     res.status(500).send("Failed to create post.");
   }
@@ -353,7 +419,19 @@ router.post("/posts/:id/update", requireAdmin, upload.single("pdfFile"), async (
   const prisma = getPrisma();
 
   const id = req.params.id;
-  const existing = await prisma.post.findUnique({ where: { id } });
+
+  let existing;
+  try {
+    existing = await prisma.post.findUnique({ where: { id } });
+  } catch (e) {
+    if (isTableMissingError(e)) {
+      return res
+        .status(503)
+        .send("Database schema is not ready yet. Please refresh in a moment.");
+    }
+    throw e;
+  }
+
   if (!existing) return res.status(404).send("Not found.");
 
   try {
@@ -379,7 +457,6 @@ router.post("/posts/:id/update", requireAdmin, upload.single("pdfFile"), async (
       });
     }
 
-    // Automatically date posts if missing.
     const postDate = postDateRaw ? new Date(postDateRaw) : new Date();
     if (Number.isNaN(postDate.getTime())) {
       return res.status(400).render("admin/post-form", {
@@ -398,10 +475,7 @@ router.post("/posts/:id/update", requireAdmin, upload.single("pdfFile"), async (
 
       if (req.file) {
         if (existing.pdfPath) {
-          const oldFsPath = path.join(
-            process.cwd(),
-            existing.pdfPath.replace("/uploads/", "uploads/")
-          );
+          const oldFsPath = path.join(uploadsDir, path.basename(existing.pdfPath));
           if (fs.existsSync(oldFsPath)) fs.unlinkSync(oldFsPath);
         }
 
@@ -428,10 +502,7 @@ router.post("/posts/:id/update", requireAdmin, upload.single("pdfFile"), async (
       pdfPath = null;
 
       if (existing.pdfPath) {
-        const oldFsPath = path.join(
-          process.cwd(),
-          existing.pdfPath.replace("/uploads/", "uploads/")
-        );
+        const oldFsPath = path.join(uploadsDir, path.basename(existing.pdfPath));
         if (fs.existsSync(oldFsPath)) fs.unlinkSync(oldFsPath);
       }
     }
@@ -460,6 +531,11 @@ router.post("/posts/:id/update", requireAdmin, upload.single("pdfFile"), async (
 
     res.redirect("/admin/posts?saved=true");
   } catch (e) {
+    if (isTableMissingError(e)) {
+      return res
+        .status(503)
+        .send("Database schema is not ready yet. Please refresh in a moment.");
+    }
     console.error(e);
     res.status(500).send("Failed to update post.");
   }
@@ -470,28 +546,25 @@ router.post("/posts/:id/delete", requireAdmin, async (req, res, next) => {
     const prisma = getPrisma();
 
     const id = req.params.id;
+
     const post = await prisma.post.findUnique({ where: { id } });
     if (!post) return res.redirect("/admin/posts");
 
     if (post.pdfPath) {
-      const oldFsPath = path.join(process.cwd(), post.pdfPath.replace("/uploads/", "uploads/"));
+      const oldFsPath = path.join(uploadsDir, path.basename(post.pdfPath));
       if (fs.existsSync(oldFsPath)) fs.unlinkSync(oldFsPath);
     }
 
     await prisma.post.delete({ where: { id } });
     res.redirect("/admin/posts?saved=true");
   } catch (err) {
+    if (isTableMissingError(err)) {
+      return res
+        .status(503)
+        .send("Database schema is not ready yet. Please refresh in a moment.");
+    }
     next(err);
   }
 });
-
-function escapeHtml(str) {
-  return String(str)
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#039;");
-}
 
 export default router;
