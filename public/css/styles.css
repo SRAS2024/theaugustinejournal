@@ -322,11 +322,6 @@ main.container {
   margin: 0 0 16px 0;
 }
 
-.postContent .pdf-text p {
-  white-space: pre-wrap;
-  word-break: break-word;
-}
-
 .postContent .pdf-text h3,
 .postContent .pdf-text h4 {
   text-align: center;

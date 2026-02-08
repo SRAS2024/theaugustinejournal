@@ -77,29 +77,35 @@ function pdfTextToHtml(rawText) {
   const html = blocks
     .map((block, i) => {
       const trimmed = block.trim();
+
+      // Skip standalone page numbers (e.g. "1", "23", "iv")
+      if (/^\d{1,4}$/.test(trimmed) || /^[ivxlc]+$/i.test(trimmed)) return "";
+
       const lines = trimmed.split("\n");
       const nextBlock = blocks[i + 1]?.trim();
 
-      // Detect heading: short block (1-2 lines, under 100 chars)
-      if (lines.length <= 2 && trimmed.length < 100) {
-        const isAllCaps = trimmed === trimmed.toUpperCase() && /[A-Z]{2,}/.test(trimmed);
+      // Rejoin wrapped lines into a single string for analysis
+      const joined = lines.map((l) => l.trim()).join(" ").replace(/\s{2,}/g, " ");
+
+      // Detect heading: short text (under 120 chars) spanning at most 3 raw lines
+      if (lines.length <= 3 && joined.length < 120) {
+        const isAllCaps = joined === joined.toUpperCase() && /[A-Z]{2,}/.test(joined);
         if (isAllCaps) {
-          return `<h3>${escapeHtml(trimmed)}</h3>`;
+          return `<h3>${escapeHtml(joined)}</h3>`;
         }
-        // Short single line followed by a longer block → likely a subheading
-        if (lines.length === 1 && trimmed.length < 60 && nextBlock && nextBlock.length > trimmed.length * 2) {
-          return `<h4>${escapeHtml(trimmed)}</h4>`;
+        // Looks like a title or section heading when followed by longer content
+        if (joined.length < 100 && (!nextBlock || nextBlock.length > joined.length)) {
+          return `<h4>${escapeHtml(joined)}</h4>`;
         }
       }
 
-      // Preserve original whitespace per line (indentation, alignment)
-      const escaped = block
-        .split("\n")
-        .map((line) => escapeHtml(line))
-        .join("\n");
+      // Normal paragraph: rejoin wrapped lines so the browser reflows naturally
+      const firstLineIndent = lines[0].match(/^(\s{3,})/)?.[1]?.length || 0;
+      const style = firstLineIndent ? ' style="text-indent: 2em"' : "";
 
-      return `<p>${escaped}</p>`;
+      return `<p${style}>${escapeHtml(joined)}</p>`;
     })
+    .filter(Boolean)
     .join("\n");
 
   return `<div class="pdf-text">${html}</div>`;
