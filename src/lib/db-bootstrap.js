@@ -1,26 +1,25 @@
+// src/lib/db-bootstrap.js
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import { execSync } from "child_process";
 import { PrismaClient } from "@prisma/client";
 import { nanoid } from "nanoid";
+import { Client } from "pg";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const projectRoot = path.resolve(__dirname, "../../");
 
 function prismaCommand() {
-  // Allow an override if you ever need it in Railway vars
   if (process.env.PRISMA_CLI_CMD) return process.env.PRISMA_CLI_CMD;
 
   const binName = process.platform === "win32" ? "prisma.cmd" : "prisma";
   const local = path.join(projectRoot, "node_modules", ".bin", binName);
 
-  // Prefer local install (best and fastest)
   if (fs.existsSync(local)) return local;
 
-  // Fallback: use npx (helps if prisma is not installed in production deps)
-  return process.platform === "win32" ? "npx prisma" : "npx prisma";
+  return "npx prisma";
 }
 
 function run(command) {
@@ -32,78 +31,85 @@ function run(command) {
   }).toString();
 }
 
-function listMigrationNames() {
-  const migrationsDir = path.join(projectRoot, "prisma", "migrations");
-  if (!fs.existsSync(migrationsDir)) return [];
+function sslForUrl(url) {
+  const disable =
+    url.includes("sslmode=disable") || url.includes("localhost") || url.includes("127.0.0.1");
+  return disable ? false : { rejectUnauthorized: false };
+}
 
-  return fs
-    .readdirSync(migrationsDir, { withFileTypes: true })
-    .filter((d) => d.isDirectory())
-    .map((d) => d.name)
-    .filter((name) => name && !name.startsWith("."));
+async function expectedTablesExist() {
+  const url = process.env.DATABASE_URL;
+  if (!url) return false;
+
+  const client = new Client({ connectionString: url, ssl: sslForUrl(url) });
+  try {
+    await client.connect();
+    const expected = ["SiteSettings", "Notice", "Post"];
+    const r = await client.query(
+      `
+      select table_name
+      from information_schema.tables
+      where table_schema = 'public'
+        and table_name = any($1::text[])
+      `,
+      [expected]
+    );
+    const found = new Set(r.rows.map((x) => x.table_name));
+    return expected.every((t) => found.has(t));
+  } catch {
+    return false;
+  } finally {
+    try {
+      await client.end();
+    } catch {}
+  }
 }
 
 /**
- * Run Prisma migrations via `prisma migrate deploy`.
- * If the DB is non-empty but not yet baselined (P3005), automatically baseline
- * by marking all existing migrations as applied, then re-run deploy.
+ * Runs migrations. If they "succeed" but the expected tables are still missing,
+ * it automatically falls back to `prisma db push` to create the schema from schema.prisma.
  *
- * Returns { ok: boolean, baselined?: boolean, error?: string }
+ * This avoids reliance on the migrations folder being present in the deployed container.
  */
 export async function runMigrations() {
   const prisma = prismaCommand();
 
   try {
     console.log("[bootstrap] Running prisma migrate deploy ...");
-    run(`${prisma} migrate deploy`);
-    console.log("[bootstrap] Migrations applied successfully.");
-    return { ok: true, baselined: false };
+    const out = run(`${prisma} migrate deploy`);
+    if (out?.trim()) console.log(out.trim());
+    console.log("[bootstrap] migrate deploy exited successfully.");
+
+    const okAfterDeploy = await expectedTablesExist();
+    if (okAfterDeploy) {
+      console.log("[bootstrap] Expected tables exist after migrate deploy.");
+      return { ok: true, baselined: false, createdViaPush: false };
+    }
+
+    console.log("[bootstrap] Tables missing after deploy. Running prisma db push fallback ...");
+    const pushOut = run(`${prisma} db push --skip-generate`);
+    if (pushOut?.trim()) console.log(pushOut.trim());
+
+    const okAfterPush = await expectedTablesExist();
+    if (!okAfterPush) {
+      const msg =
+        "Schema tables are missing after migrate deploy and db push. Verify DATABASE_URL points to the intended database.";
+      console.error("[bootstrap]", msg);
+      return { ok: false, error: msg, createdViaPush: true };
+    }
+
+    console.log("[bootstrap] Tables created via db push fallback.");
+    return { ok: true, baselined: false, createdViaPush: true };
   } catch (err) {
     const stdout = err?.stdout ? err.stdout.toString() : "";
     const stderr = err?.stderr ? err.stderr.toString() : "";
     const combined = `${stdout}\n${stderr}`.trim();
-
-    if (combined.includes("P3005")) {
-      console.log("[bootstrap] Detected P3005, baselining existing database ...");
-
-      const migrations = listMigrationNames();
-      if (!migrations.length) {
-        const msg = "P3005 detected but no prisma/migrations folders found to baseline.";
-        console.error("[bootstrap] Migration failed:", msg);
-        return { ok: false, error: msg };
-      }
-
-      try {
-        for (const name of migrations) {
-          console.log(`[bootstrap] Marking migration as applied: ${name}`);
-          run(`${prisma} migrate resolve --applied "${name}"`);
-        }
-
-        console.log("[bootstrap] Baseline complete. Re-running migrate deploy ...");
-        run(`${prisma} migrate deploy`);
-        console.log("[bootstrap] Migrations ready after baseline.");
-        return { ok: true, baselined: true };
-      } catch (e2) {
-        const s2 = e2?.stdout ? e2.stdout.toString() : "";
-        const e2err = e2?.stderr ? e2.stderr.toString() : "";
-        const msg2 = `${s2}\n${e2err}`.trim() || e2?.message || String(e2);
-        console.error("[bootstrap] Baseline or re-deploy failed:", msg2);
-        return { ok: false, error: msg2 };
-      }
-    }
-
     const msg = combined || err?.message || String(err);
     console.error("[bootstrap] Migration failed:", msg);
     return { ok: false, error: msg };
   }
 }
 
-/**
- * Lightweight seed: ensures SiteSettings row exists and at least one Notice is
- * present so the first page load never crashes on an empty database.
- *
- * This is intentionally idempotent and safe to call on every startup.
- */
 export async function runSeed() {
   const prisma = new PrismaClient();
   try {
@@ -136,25 +142,17 @@ export async function runSeed() {
   }
 }
 
-/**
- * Full bootstrap: migrate then seed.
- * Returns { ok: boolean, baselined?: boolean, error?: string }
- *
- * IMPORTANT:
- * If migrations fail, throw so server.js enters the 503 fallback instead of
- * continuing to load routes against a broken schema.
- */
 export async function bootstrap() {
   const migration = await runMigrations();
   if (!migration.ok) {
     throw new Error(migration.error || "Database migrations failed.");
   }
 
-  try {
-    await runSeed();
-  } catch (err) {
-    console.error("[bootstrap] Seed failed (non-fatal):", err?.message || err);
-  }
+  await runSeed();
 
-  return { ok: true, baselined: migration.baselined === true };
+  return {
+    ok: true,
+    baselined: migration.baselined === true,
+    createdViaPush: migration.createdViaPush === true
+  };
 }
