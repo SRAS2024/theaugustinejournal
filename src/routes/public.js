@@ -1,7 +1,12 @@
+// src/routes/public.js
 import { Router } from "express";
 import { getPrisma } from "../lib/db.js";
 
 const router = Router();
+
+function isTableMissingError(err) {
+  return err?.code === "P2021";
+}
 
 async function getCommon() {
   try {
@@ -12,8 +17,7 @@ async function getCommon() {
     ]);
     return { settings, notices };
   } catch (err) {
-    // P2021: table does not exist — can happen briefly before migrations finish
-    if (err?.code === "P2021") {
+    if (isTableMissingError(err)) {
       console.warn("[public] Table missing (P2021), returning safe defaults:", err.message);
       return {
         settings: { id: 1, aboutHtml: "", updatedAt: new Date() },
@@ -24,14 +28,27 @@ async function getCommon() {
   }
 }
 
+async function safePostsQuery(fn, fallbackValue) {
+  try {
+    return await fn();
+  } catch (err) {
+    if (isTableMissingError(err)) return fallbackValue;
+    throw err;
+  }
+}
+
 router.get("/", async (req, res, next) => {
   try {
     const prisma = getPrisma();
     const { settings, notices } = await getCommon();
 
-    const latest = await prisma.post.findFirst({
-      orderBy: [{ postDate: "desc" }, { createdAt: "desc" }]
-    });
+    const latest = await safePostsQuery(
+      () =>
+        prisma.post.findFirst({
+          orderBy: [{ postDate: "desc" }, { createdAt: "desc" }]
+        }),
+      null
+    );
 
     res.render("home", {
       settings,
@@ -48,10 +65,14 @@ router.get("/blog", async (req, res, next) => {
     const prisma = getPrisma();
     const { settings, notices } = await getCommon();
 
-    const posts = await prisma.post.findMany({
-      where: { type: "BLOG" },
-      orderBy: [{ postDate: "desc" }, { createdAt: "desc" }]
-    });
+    const posts = await safePostsQuery(
+      () =>
+        prisma.post.findMany({
+          where: { type: "BLOG" },
+          orderBy: [{ postDate: "desc" }, { createdAt: "desc" }]
+        }),
+      []
+    );
 
     res.render("list", {
       pageTitle: "Blog",
@@ -69,10 +90,14 @@ router.get("/essays", async (req, res, next) => {
     const prisma = getPrisma();
     const { settings, notices } = await getCommon();
 
-    const posts = await prisma.post.findMany({
-      where: { type: "ESSAY" },
-      orderBy: [{ postDate: "desc" }, { createdAt: "desc" }]
-    });
+    const posts = await safePostsQuery(
+      () =>
+        prisma.post.findMany({
+          where: { type: "ESSAY" },
+          orderBy: [{ postDate: "desc" }, { createdAt: "desc" }]
+        }),
+      []
+    );
 
     res.render("list", {
       pageTitle: "Essays",
@@ -90,10 +115,14 @@ router.get("/letters", async (req, res, next) => {
     const prisma = getPrisma();
     const { settings, notices } = await getCommon();
 
-    const posts = await prisma.post.findMany({
-      where: { type: "LETTER" },
-      orderBy: [{ postDate: "desc" }, { createdAt: "desc" }]
-    });
+    const posts = await safePostsQuery(
+      () =>
+        prisma.post.findMany({
+          where: { type: "LETTER" },
+          orderBy: [{ postDate: "desc" }, { createdAt: "desc" }]
+        }),
+      []
+    );
 
     res.render("list", {
       pageTitle: "Letters",
@@ -111,9 +140,13 @@ router.get("/post/:slug", async (req, res, next) => {
     const prisma = getPrisma();
     const { settings, notices } = await getCommon();
 
-    const post = await prisma.post.findUnique({
-      where: { slug: req.params.slug }
-    });
+    const post = await safePostsQuery(
+      () =>
+        prisma.post.findUnique({
+          where: { slug: req.params.slug }
+        }),
+      null
+    );
 
     if (!post) return res.status(404).send("Post not found.");
 
