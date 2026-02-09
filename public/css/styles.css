@@ -327,6 +327,37 @@ main.container {
   text-align: center;
 }
 
+/* Centred title / subtitle at top of extracted PDF text */
+.postContent .pdf-text .pdf-doc-title {
+  text-align: center;
+  font-weight: 600;
+  font-size: 1.2em;
+  margin-bottom: 28px;
+  line-height: 1.5;
+}
+
+/* Justified body paragraphs for a clean, professional look */
+.postContent .pdf-text > p:not(.pdf-doc-title):not(.pdf-ref-entry) {
+  text-align: justify;
+}
+
+/* References / Bibliography heading */
+.postContent .pdf-text .pdf-ref-heading {
+  text-align: center;
+  margin-top: 36px;
+  padding-top: 24px;
+  border-top: 1px solid var(--border);
+}
+
+/* Reference entries – hanging indent for clean bibliography style */
+.postContent .pdf-text .pdf-ref-entry {
+  padding-left: 2em;
+  text-indent: -2em;
+  text-align: left;
+  margin-bottom: 12px;
+  font-size: 0.95em;
+}
+
 .postContent h1, .postContent h2, .postContent h3, .postContent h4 {
   margin: 28px 0 12px 0;
   font-weight: 600;

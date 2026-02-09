@@ -72,43 +72,93 @@ function pdfTextToHtml(rawText) {
     return "<p>PDF uploaded, but no selectable text was found.</p>";
   }
 
-  const blocks = rawText.split(/\n\s*\n/).filter((b) => b.trim());
+  /* ── Phase 1: strip page numbers & repeated running headers/footers ── */
+  const rawLines = rawText.split("\n");
 
-  const html = blocks
-    .map((block, i) => {
-      const trimmed = block.trim();
+  const pageNumLine = [
+    /^\s*\d{1,4}\s*$/,                    // "5"
+    /^\s*[ivxlc]+\s*$/i,                  // "iv", "XII"
+    /^\s*[-–—]\s*\d{1,4}\s*[-–—]\s*$/,   // "- 5 -"
+    /^\s*page\s+\d{1,4}\s*$/i,            // "Page 5"
+  ];
 
-      // Skip standalone page numbers (e.g. "1", "23", "iv")
-      if (/^\d{1,4}$/.test(trimmed) || /^[ivxlc]+$/i.test(trimmed)) return "";
+  // Count normalised short lines to find running headers/footers
+  const freq = {};
+  for (const l of rawLines) {
+    const t = l.trim();
+    if (!t || t.length > 100) continue;
+    // Strip leading/trailing page numbers before counting
+    const norm = t.replace(/^\d{1,4}\s+/, "").replace(/\s+\d{1,4}$/, "").trim();
+    if (norm) freq[norm] = (freq[norm] || 0) + 1;
+  }
+  const repeated = new Set(
+    Object.entries(freq).filter(([, c]) => c >= 3).map(([t]) => t)
+  );
 
-      const lines = trimmed.split("\n");
-      const nextBlock = blocks[i + 1]?.trim();
+  const cleaned = rawLines.filter((l) => {
+    const t = l.trim();
+    if (!t) return true; // keep blank lines for paragraph splitting
+    if (pageNumLine.some((r) => r.test(t))) return false;
+    const norm = t.replace(/^\d{1,4}\s+/, "").replace(/\s+\d{1,4}$/, "").trim();
+    if (norm && repeated.has(norm)) return false;
+    return true;
+  });
 
-      // Rejoin wrapped lines into a single string for analysis
-      const joined = lines.map((l) => l.trim()).join(" ").replace(/\s{2,}/g, " ");
+  /* ── Phase 2: split into paragraph blocks ── */
+  const blocks = cleaned.join("\n").split(/\n\s*\n/)
+    .map((b) => b.trim()).filter(Boolean)
+    .filter((b) => !/^\d{1,4}$/.test(b) && !/^[ivxlc]+$/i.test(b));
 
-      // Detect heading: short text (under 120 chars) spanning at most 3 raw lines
-      if (lines.length <= 3 && joined.length < 120) {
-        const isAllCaps = joined === joined.toUpperCase() && /[A-Z]{2,}/.test(joined);
-        if (isAllCaps) {
-          return `<h3>${escapeHtml(joined)}</h3>`;
-        }
-        // Looks like a title or section heading when followed by longer content
-        if (joined.length < 100 && (!nextBlock || nextBlock.length > joined.length)) {
-          return `<h4>${escapeHtml(joined)}</h4>`;
-        }
+  /* ── Phase 3: convert blocks to HTML ── */
+  let inReferences = false;
+  const htmlParts = [];
+
+  for (let i = 0; i < blocks.length; i++) {
+    const block = blocks[i];
+    const lines = block.split("\n");
+    const joined = lines.map((l) => l.trim()).join(" ").replace(/\s{2,}/g, " ");
+    const nextBlock = blocks[i + 1]?.trim();
+
+    /* First block: centred title/subtitle if fewer than 3 sentences */
+    if (i === 0) {
+      const sentences = (joined.match(/[.!?](?:\s|$)/g) || []).length;
+      if (sentences < 3 && joined.length < 300) {
+        htmlParts.push(`<p class="pdf-doc-title">${escapeHtml(joined)}</p>`);
+        continue;
       }
+    }
 
-      // Normal paragraph: rejoin wrapped lines so the browser reflows naturally
-      const firstLineIndent = lines[0].match(/^(\s{3,})/)?.[1]?.length || 0;
-      const style = firstLineIndent ? ' style="text-indent: 2em"' : "";
+    /* References / Bibliography / Works Cited heading */
+    if (/^(references|bibliography|works?\s*cited|sources)$/i.test(joined)) {
+      inReferences = true;
+      htmlParts.push(`<h3 class="pdf-ref-heading">${escapeHtml(joined)}</h3>`);
+      continue;
+    }
 
-      return `<p${style}>${escapeHtml(joined)}</p>`;
-    })
-    .filter(Boolean)
-    .join("\n");
+    /* ALL-CAPS heading */
+    if (lines.length <= 3 && joined.length < 120) {
+      const isAllCaps = joined === joined.toUpperCase() && /[A-Z]{2,}/.test(joined);
+      if (isAllCaps) {
+        htmlParts.push(`<h3>${escapeHtml(joined)}</h3>`);
+        continue;
+      }
+      if (joined.length < 100 && (!nextBlock || nextBlock.length > joined.length)) {
+        htmlParts.push(`<h4>${escapeHtml(joined)}</h4>`);
+        continue;
+      }
+    }
 
-  return `<div class="pdf-text">${html}</div>`;
+    /* Normal paragraph or reference entry */
+    if (inReferences) {
+      htmlParts.push(`<p class="pdf-ref-entry">${escapeHtml(joined)}</p>`);
+    } else {
+      const indent = lines[0].match(/^(\s{3,})/)?.[1]?.length || 0;
+      const style = indent ? ' style="text-indent: 2em"' : "";
+      htmlParts.push(`<p${style}>${escapeHtml(joined)}</p>`);
+    }
+  }
+
+  return `<div class="pdf-text">${htmlParts.filter(Boolean).join("\n")}</div>`;
 }
 
 function deletePdfFile(pdfPath) {
