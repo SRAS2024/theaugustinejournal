@@ -9,31 +9,35 @@
 
   function typeLabelFor(t) {
     if (t === "BLOG") return "Blog";
-    if (t === "ESSAY") return "Essays";
-    return "Letters";
+    if (t === "ESSAY") return "Essay";
+    return "Letter";
   }
 
   const typeLabel = typeLabelFor(post.type);
   const typeKey = post.type === "BLOG" ? "blog" : post.type === "ESSAY" ? "essays" : "letters";
 
   const body = `
-    <section class="section card postShell">
-      <div class="postHeader">
-        <h2 data-translate="content" data-original="${String(post.title || "").replace(/"/g, "&quot;")}">${post.title}</h2>
-        <div class="meta">
-          <span data-i18n="${typeKey}">${typeLabel}</span>
-          <span> • ${formatDate(post.postDate)}</span>
+    <section class="postShell">
+      <header class="postHeader">
+        <h1 class="postTitle" data-translate="content" data-original="${String(post.title || "").replace(/"/g, "&quot;")}">${post.title}</h1>
+        <div class="postMeta">
+          <span class="postType" data-i18n="${typeKey}">${typeLabel}</span>
+          <span class="postMetaSep">&mdash;</span>
+          <time class="postDate">${formatDate(post.postDate)}</time>
         </div>
-      </div>
+      </header>
+
+      <div class="postRule"></div>
 
       <article class="postContent">
         ${post.contentHtml || ""}
-        ${
-          post.pdfPath
-            ? `<p class="pdf-link"><a href="${post.pdfPath}" target="_blank" rel="noopener noreferrer">Open original PDF</a></p>`
-            : ""
-        }
       </article>
+
+      ${
+        post.pdfPath
+          ? `<footer class="postFooter"><a class="pdf-link" href="${post.pdfPath}" target="_blank" rel="noopener noreferrer">View Original PDF</a></footer>`
+          : ""
+      }
     </section>
   `;
 %>
