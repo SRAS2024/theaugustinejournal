@@ -72,7 +72,7 @@ function pdfTextToHtml(rawText) {
     return "<p>PDF uploaded, but no selectable text was found.</p>";
   }
 
-  /* ── Phase 1: strip page numbers & repeated running headers/footers ── */
+  /* ── Phase 1: aggressively strip page numbers & repeated headers/footers ── */
   const rawLines = rawText.split("\n");
 
   const pageNumLine = [
@@ -80,19 +80,19 @@ function pdfTextToHtml(rawText) {
     /^\s*[ivxlc]+\s*$/i,                  // "iv", "XII"
     /^\s*[-–—]\s*\d{1,4}\s*[-–—]\s*$/,   // "- 5 -"
     /^\s*page\s+\d{1,4}\s*$/i,            // "Page 5"
+    /^\s*\d{1,4}\s*of\s*\d{1,4}\s*$/i,   // "5 of 10"
   ];
 
-  // Count normalised short lines to find running headers/footers
+  // Count normalised short lines to find running headers/footers (threshold: 2)
   const freq = {};
   for (const l of rawLines) {
     const t = l.trim();
-    if (!t || t.length > 100) continue;
-    // Strip leading/trailing page numbers before counting
+    if (!t || t.length > 120) continue;
     const norm = t.replace(/^\d{1,4}\s+/, "").replace(/\s+\d{1,4}$/, "").trim();
     if (norm) freq[norm] = (freq[norm] || 0) + 1;
   }
   const repeated = new Set(
-    Object.entries(freq).filter(([, c]) => c >= 3).map(([t]) => t)
+    Object.entries(freq).filter(([, c]) => c >= 2).map(([t]) => t)
   );
 
   const cleaned = rawLines.filter((l) => {
@@ -110,51 +110,48 @@ function pdfTextToHtml(rawText) {
     .filter((b) => !/^\d{1,4}$/.test(b) && !/^[ivxlc]+$/i.test(b));
 
   /* ── Phase 3: convert blocks to HTML ── */
+  /*  NO headings, NO page numbers, NO repeated titles.
+   *  Only exception: References / Bibliography / Works Cited heading.       */
   let inReferences = false;
   const htmlParts = [];
 
-  for (let i = 0; i < blocks.length; i++) {
+  // Skip the first block if it looks like a title (the post already has a
+  // title from the database, so repeating it inside the body is redundant).
+  let startIndex = 0;
+  if (blocks.length > 0) {
+    const first = blocks[0].split("\n").map((l) => l.trim()).join(" ").replace(/\s{2,}/g, " ");
+    const sentences = (first.match(/[.!?](?:\s|$)/g) || []).length;
+    if (sentences < 3 && first.length < 300) startIndex = 1;
+  }
+
+  for (let i = startIndex; i < blocks.length; i++) {
     const block = blocks[i];
     const lines = block.split("\n");
     const joined = lines.map((l) => l.trim()).join(" ").replace(/\s{2,}/g, " ");
-    const nextBlock = blocks[i + 1]?.trim();
 
-    /* First block: centred title/subtitle if fewer than 3 sentences */
-    if (i === 0) {
-      const sentences = (joined.match(/[.!?](?:\s|$)/g) || []).length;
-      if (sentences < 3 && joined.length < 300) {
-        htmlParts.push(`<p class="pdf-doc-title">${escapeHtml(joined)}</p>`);
-        continue;
-      }
-    }
-
-    /* References / Bibliography / Works Cited heading */
+    /* References / Bibliography / Works Cited heading — the ONLY heading kept */
     if (/^(references|bibliography|works?\s*cited|sources)$/i.test(joined)) {
       inReferences = true;
-      htmlParts.push(`<h3 class="pdf-ref-heading">${escapeHtml(joined)}</h3>`);
+      htmlParts.push(`<h3 class="pdf-ref-heading">References</h3>`);
       continue;
     }
 
-    /* ALL-CAPS heading */
-    if (lines.length <= 3 && joined.length < 120) {
+    /* Skip any block that looks like a standalone heading / section title
+       (ALL-CAPS, very short, or single-line with < 60 chars and no period) */
+    if (!inReferences && lines.length <= 2 && joined.length < 80) {
       const isAllCaps = joined === joined.toUpperCase() && /[A-Z]{2,}/.test(joined);
-      if (isAllCaps) {
-        htmlParts.push(`<h3>${escapeHtml(joined)}</h3>`);
-        continue;
-      }
-      if (joined.length < 100 && (!nextBlock || nextBlock.length > joined.length)) {
-        htmlParts.push(`<h4>${escapeHtml(joined)}</h4>`);
-        continue;
-      }
+      const looksLikeHeading = !joined.includes(".") && joined.length < 60;
+      if (isAllCaps || looksLikeHeading) continue;
     }
 
-    /* Normal paragraph or reference entry */
+    /* Reference entry */
     if (inReferences) {
       htmlParts.push(`<p class="pdf-ref-entry">${escapeHtml(joined)}</p>`);
     } else {
+      /* Normal body paragraph — use first-line indent for continuation feel */
       const indent = lines[0].match(/^(\s{3,})/)?.[1]?.length || 0;
-      const style = indent ? ' style="text-indent: 2em"' : "";
-      htmlParts.push(`<p${style}>${escapeHtml(joined)}</p>`);
+      const cls = indent ? ' class="pdf-indent"' : "";
+      htmlParts.push(`<p${cls}>${escapeHtml(joined)}</p>`);
     }
   }
 
