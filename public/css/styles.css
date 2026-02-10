@@ -3,20 +3,21 @@
 :root {
   --bg: #0a0a0e;
   --bg2: #111116;
-  --card: rgba(255, 255, 255, 0.03);
-  --card-border: rgba(255, 255, 255, 0.07);
+  --card: rgba(255, 255, 255, 0.025);
+  --card-border: rgba(255, 255, 255, 0.06);
+  --card-shadow: 0 2px 12px rgba(0, 0, 0, 0.35), 0 1px 3px rgba(0, 0, 0, 0.2);
   --text: #e8e8ed;
   --muted: #8a8a99;
-  --border: rgba(255, 255, 255, 0.08);
-  --border-hover: rgba(255, 255, 255, 0.18);
+  --border: rgba(255, 255, 255, 0.07);
+  --border-hover: rgba(255, 255, 255, 0.14);
   --purple: #5b2d8e;
-  --purple-soft: rgba(91, 45, 142, 0.10);
-  --purple-border: rgba(91, 45, 142, 0.28);
-  --purple-glow: rgba(91, 45, 142, 0.06);
+  --purple-soft: rgba(91, 45, 142, 0.07);
+  --purple-border: rgba(91, 45, 142, 0.2);
+  --purple-glow: rgba(91, 45, 142, 0.04);
   --radius: 8px;
-  --radius-lg: 14px;
-  --font-serif: Georgia, "Times New Roman", Times, serif;
-  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --radius-lg: 12px;
+  --font-serif: "Cormorant Garamond", Georgia, "Times New Roman", Times, serif;
+  --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   --max-w: 740px;
   --max-w-wide: 960px;
 }
@@ -29,6 +30,8 @@ body {
   display: flex;
   flex-direction: column;
   background: var(--bg);
+  background-image:
+    radial-gradient(ellipse 70% 50% at 50% 0%, rgba(91, 45, 142, 0.04) 0%, transparent 70%);
   color: var(--text);
   font-family: var(--font-serif);
   font-size: 16px;
@@ -76,9 +79,9 @@ main.container {
 
 .brand {
   font-family: var(--font-serif);
-  font-size: 32px;
-  font-weight: 600;
-  letter-spacing: 0.3px;
+  font-size: 30px;
+  font-weight: 500;
+  letter-spacing: 0.5px;
   text-align: center;
   line-height: 1.2;
   margin: 0;
@@ -128,7 +131,9 @@ main.container {
   gap: 6px;
   padding: 14px 0 12px;
   font-family: var(--font-sans);
-  font-size: 14px;
+  font-size: 13px;
+  font-weight: 400;
+  letter-spacing: 0.3px;
 }
 
 .nav a, .nav .nav-label {
@@ -143,7 +148,7 @@ main.container {
 .nav a:hover {
   color: var(--text);
   text-decoration: none;
-  border-color: var(--border);
+  border-color: rgba(255, 255, 255, 0.06);
 }
 
 .nav a.active {
@@ -157,11 +162,12 @@ main.container {
   background: var(--card);
   border: 1px solid var(--card-border);
   border-radius: var(--radius-lg);
+  box-shadow: var(--card-shadow);
 }
 
 .section {
-  margin: 28px 0;
-  padding: 32px 28px;
+  margin: 32px 0;
+  padding: 36px 32px;
 }
 
 /* ===== Notices ===== */
@@ -176,9 +182,11 @@ main.container {
   border: 1px solid var(--purple-border);
   color: var(--text);
   font-family: var(--font-sans);
-  font-size: 14px;
+  font-size: 13px;
+  font-weight: 400;
   line-height: 1.45;
   text-align: center;
+  letter-spacing: 0.15px;
 }
 
 .notice + .notice {
@@ -188,8 +196,9 @@ main.container {
 /* ===== About ===== */
 .about {
   text-align: center;
-  font-size: 16px;
-  line-height: 1.85;
+  font-family: var(--font-serif);
+  font-size: 17px;
+  line-height: 1.9;
   color: var(--text);
   max-width: 620px;
   margin: 0 auto;
@@ -208,8 +217,9 @@ main.container {
 
 .latest .label {
   color: var(--muted);
-  font-size: 13px;
-  letter-spacing: 0.4px;
+  font-size: 12px;
+  font-weight: 400;
+  letter-spacing: 0.5px;
   text-transform: uppercase;
   margin-bottom: 12px;
   display: block;
@@ -222,32 +232,33 @@ main.container {
   border: 1px solid var(--border);
   background: rgba(255, 255, 255, 0.02);
   font-family: var(--font-serif);
-  font-size: 17px;
-  font-weight: 600;
-  transition: border-color 0.2s, background 0.2s;
+  font-size: 18px;
+  font-weight: 500;
+  transition: border-color 0.2s, background 0.2s, transform 0.15s;
 }
 
 .latest a:hover {
   border-color: var(--purple-border);
   background: var(--purple-soft);
   text-decoration: none;
+  transform: translateY(-1px);
 }
 
 /* ===== Muted ===== */
 .muted {
   color: var(--muted);
   font-family: var(--font-sans);
-  font-size: 14px;
+  font-size: 13px;
 }
 
 /* ===== List Page ===== */
 .listTitle {
-  margin: 0 0 20px 0;
+  margin: 0 0 24px 0;
   font-size: 24px;
-  font-weight: 600;
+  font-weight: 500;
   text-align: center;
   font-family: var(--font-serif);
-  letter-spacing: 0.2px;
+  letter-spacing: 0.4px;
 }
 
 .postRow {
@@ -255,35 +266,38 @@ main.container {
   align-items: flex-start;
   justify-content: space-between;
   gap: 16px;
-  padding: 16px 18px;
+  padding: 18px 20px;
   border-radius: var(--radius);
   border: 1px solid var(--border);
-  background: rgba(0, 0, 0, 0.12);
-  transition: border-color 0.2s;
+  background: rgba(0, 0, 0, 0.1);
+  transition: border-color 0.2s, transform 0.15s;
 }
 
 .postRow:hover {
   border-color: var(--border-hover);
+  transform: translateY(-1px);
 }
 
 .postRow + .postRow {
-  margin-top: 8px;
+  margin-top: 10px;
 }
 
 .postRow .title {
   font-family: var(--font-serif);
-  font-size: 17px;
-  font-weight: 600;
+  font-size: 18px;
+  font-weight: 500;
   margin: 0;
   line-height: 1.35;
 }
 
 .postRow .date {
   font-family: var(--font-sans);
-  font-size: 13px;
+  font-size: 12px;
+  font-weight: 400;
   color: var(--muted);
   white-space: nowrap;
-  margin-top: 2px;
+  margin-top: 4px;
+  letter-spacing: 0.2px;
 }
 
 /* ===== Single Post ===== */
@@ -297,7 +311,7 @@ main.container {
 
 /* ── Header ── */
 .postHeader {
-  text-align: left;
+  text-align: center;
   margin-bottom: 0;
 }
 
@@ -305,20 +319,22 @@ main.container {
   margin: 0;
   font-family: var(--font-serif);
   font-size: 32px;
-  font-weight: 700;
+  font-weight: 500;
   line-height: 1.25;
-  letter-spacing: -0.3px;
+  letter-spacing: 0.3px;
   color: var(--text);
 }
 
 .postMeta {
-  margin-top: 10px;
+  margin-top: 12px;
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 8px;
   font-family: var(--font-sans);
-  font-size: 13px;
-  color: var(--muted);
+  font-size: 12px;
+  font-weight: 400;
+  color: rgba(138, 138, 153, 0.75);
   letter-spacing: 0.4px;
 }
 
@@ -326,17 +342,17 @@ main.container {
   text-transform: uppercase;
   letter-spacing: 0.8px;
   font-size: 11px;
-  font-weight: 600;
-  color: rgba(168, 139, 212, 0.85);
+  font-weight: 500;
+  color: rgba(168, 139, 212, 0.65);
 }
 
 .postMetaSep {
-  color: rgba(138, 138, 153, 0.35);
-  font-size: 12px;
+  color: rgba(138, 138, 153, 0.3);
+  font-size: 11px;
 }
 
 .postDate {
-  font-size: 13px;
+  font-size: 12px;
 }
 
 /* ── Decorative rule between header and body ── */
@@ -346,23 +362,23 @@ main.container {
   background: linear-gradient(
     to right,
     transparent,
-    rgba(168, 139, 212, 0.25) 20%,
-    rgba(168, 139, 212, 0.25) 80%,
+    rgba(168, 139, 212, 0.18) 20%,
+    rgba(168, 139, 212, 0.18) 80%,
     transparent
   );
 }
 
 /* ── Body content ── */
 .postContent {
-  line-height: 1.95;
-  font-size: 17px;
+  line-height: 2;
+  font-size: 18px;
   font-family: var(--font-serif);
   color: rgba(232, 232, 237, 0.92);
   text-align: left;
 }
 
 .postContent p {
-  margin: 0 0 20px 0;
+  margin: 0 0 22px 0;
 }
 
 /* First-line indent for PDF-extracted paragraphs */
@@ -380,7 +396,7 @@ main.container {
   text-align: center;
   font-family: var(--font-serif);
   font-size: 22px;
-  font-weight: 600;
+  font-weight: 500;
   letter-spacing: 0.5px;
   margin: 52px 0 24px;
   padding-top: 32px;
@@ -399,10 +415,23 @@ main.container {
   color: rgba(232, 232, 237, 0.82);
 }
 
+/* ── Quill alignment & indent classes ── */
+.postContent .ql-align-center { text-align: center; }
+.postContent .ql-align-right { text-align: right; }
+.postContent .ql-align-justify { text-align: justify; }
+.postContent .ql-indent-1 { padding-left: 3em; }
+.postContent .ql-indent-2 { padding-left: 6em; }
+.postContent .ql-indent-3 { padding-left: 9em; }
+.postContent .ql-indent-4 { padding-left: 12em; }
+.postContent .ql-indent-5 { padding-left: 15em; }
+.postContent .ql-indent-6 { padding-left: 18em; }
+.postContent .ql-indent-7 { padding-left: 21em; }
+.postContent .ql-indent-8 { padding-left: 24em; }
+
 /* ── Rich-text headings (non-PDF content) ── */
 .postContent h1, .postContent h2, .postContent h3, .postContent h4 {
   margin: 32px 0 14px 0;
-  font-weight: 600;
+  font-weight: 500;
   font-family: var(--font-serif);
   text-align: left;
 }
@@ -410,8 +439,8 @@ main.container {
 .postContent blockquote {
   margin: 24px 0;
   padding: 16px 24px;
-  border-left: 3px solid rgba(168, 139, 212, 0.35);
-  background: rgba(91, 45, 142, 0.06);
+  border-left: 3px solid rgba(168, 139, 212, 0.25);
+  background: rgba(91, 45, 142, 0.04);
   border-radius: 0 var(--radius) var(--radius) 0;
   font-style: italic;
   color: rgba(232, 232, 237, 0.85);
@@ -426,7 +455,7 @@ main.container {
   color: #a88bd4;
   text-decoration: underline;
   text-underline-offset: 3px;
-  text-decoration-color: rgba(168, 139, 212, 0.35);
+  text-decoration-color: rgba(168, 139, 212, 0.3);
   transition: text-decoration-color 0.2s;
 }
 
@@ -466,7 +495,8 @@ main.container {
 
 .pdf-link {
   font-family: var(--font-sans);
-  font-size: 13px;
+  font-size: 12px;
+  font-weight: 400;
   color: var(--muted);
   text-decoration: none;
   letter-spacing: 0.3px;
@@ -482,9 +512,10 @@ main.container {
 .footer {
   padding: 32px 0 40px;
   text-align: center;
-  color: rgba(138, 138, 153, 0.6);
-  font-size: 12px;
+  color: rgba(138, 138, 153, 0.5);
+  font-size: 11px;
   font-family: var(--font-sans);
+  font-weight: 400;
   letter-spacing: 0.3px;
   border-top: 1px solid var(--border);
   margin-top: 20px;
@@ -498,21 +529,29 @@ main.container {
   gap: 8px;
   border-radius: var(--radius);
   border: 1px solid var(--border);
-  background: rgba(255, 255, 255, 0.04);
+  background: rgba(255, 255, 255, 0.03);
   color: var(--text);
   padding: 10px 18px;
   cursor: pointer;
   font-family: var(--font-sans);
-  font-size: 14px;
+  font-size: 13px;
+  font-weight: 400;
+  letter-spacing: 0.2px;
   text-decoration: none;
-  transition: border-color 0.2s, background 0.2s;
+  transition: border-color 0.2s, background 0.2s, transform 0.15s;
   line-height: 1;
 }
 
 .btn:hover {
   border-color: var(--border-hover);
-  background: rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.05);
   text-decoration: none;
+  transform: translateY(-1px);
+}
+
+.btn:focus-visible {
+  outline: 2px solid rgba(91, 45, 142, 0.3);
+  outline-offset: 2px;
 }
 
 .btn.primary {
@@ -521,25 +560,25 @@ main.container {
 }
 
 .btn.primary:hover {
-  background: rgba(91, 45, 142, 0.18);
-  border-color: rgba(91, 45, 142, 0.4);
+  background: rgba(91, 45, 142, 0.12);
+  border-color: rgba(91, 45, 142, 0.3);
 }
 
 .btn.danger {
-  border-color: rgba(200, 50, 50, 0.3);
+  border-color: rgba(200, 50, 50, 0.25);
   color: #e07070;
 }
 
 .btn.danger:hover {
-  background: rgba(200, 50, 50, 0.08);
-  border-color: rgba(200, 50, 50, 0.4);
+  background: rgba(200, 50, 50, 0.06);
+  border-color: rgba(200, 50, 50, 0.35);
 }
 
 /* ===== Grid ===== */
 .grid2 {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 12px;
+  gap: 14px;
 }
 
 /* ===== Form Elements ===== */
@@ -548,16 +587,17 @@ main.container {
   padding: 10px 14px;
   border-radius: var(--radius);
   border: 1px solid var(--border);
-  background: rgba(0, 0, 0, 0.2);
+  background: rgba(0, 0, 0, 0.18);
   color: var(--text);
   font-family: var(--font-sans);
-  font-size: 14px;
+  font-size: 13px;
+  font-weight: 400;
   transition: border-color 0.2s;
   outline: none;
 }
 
 .form-input:focus {
-  border-color: var(--purple-border);
+  border-color: rgba(91, 45, 142, 0.25);
 }
 
 .form-input::placeholder {
@@ -581,39 +621,42 @@ textarea.form-input {
   display: block;
   color: var(--muted);
   font-family: var(--font-sans);
-  font-size: 13px;
+  font-size: 12px;
+  font-weight: 400;
   margin-bottom: 6px;
-  letter-spacing: 0.2px;
+  letter-spacing: 0.3px;
 }
 
 .form-hint {
   color: var(--muted);
   font-family: var(--font-sans);
-  font-size: 12px;
+  font-size: 11px;
+  font-weight: 400;
   margin-top: 4px;
-  opacity: 0.7;
+  opacity: 0.6;
 }
 
 /* ===== Admin Stats ===== */
 .stat-card {
-  padding: 18px;
+  padding: 20px;
   border-radius: var(--radius);
   border: 1px solid var(--border);
-  background: rgba(0, 0, 0, 0.12);
+  background: rgba(0, 0, 0, 0.1);
   text-align: center;
 }
 
 .stat-card .stat-label {
   color: var(--muted);
   font-family: var(--font-sans);
-  font-size: 12px;
-  letter-spacing: 0.3px;
+  font-size: 11px;
+  font-weight: 400;
+  letter-spacing: 0.4px;
   text-transform: uppercase;
 }
 
 .stat-card .stat-value {
   font-size: 28px;
-  font-weight: 700;
+  font-weight: 500;
   font-family: var(--font-sans);
   margin-top: 6px;
 }
@@ -622,11 +665,12 @@ textarea.form-input {
 .alert-success {
   padding: 12px 16px;
   border-radius: var(--radius);
-  background: rgba(50, 160, 80, 0.08);
-  border: 1px solid rgba(50, 160, 80, 0.25);
+  background: rgba(50, 160, 80, 0.06);
+  border: 1px solid rgba(50, 160, 80, 0.2);
   color: #6ccf8a;
   font-family: var(--font-sans);
-  font-size: 14px;
+  font-size: 13px;
+  font-weight: 400;
   text-align: center;
   margin-bottom: 16px;
 }
@@ -634,11 +678,12 @@ textarea.form-input {
 .alert-error {
   padding: 12px 16px;
   border-radius: var(--radius);
-  background: rgba(200, 50, 50, 0.08);
-  border: 1px solid rgba(200, 50, 50, 0.25);
+  background: rgba(200, 50, 50, 0.06);
+  border: 1px solid rgba(200, 50, 50, 0.2);
   color: #e07070;
   font-family: var(--font-sans);
-  font-size: 14px;
+  font-size: 13px;
+  font-weight: 400;
   text-align: center;
   margin-bottom: 16px;
 }
@@ -651,7 +696,9 @@ textarea.form-input {
   gap: 6px;
   padding: 14px 0 12px;
   font-family: var(--font-sans);
-  font-size: 14px;
+  font-size: 13px;
+  font-weight: 400;
+  letter-spacing: 0.3px;
   flex-wrap: wrap;
 }
 
@@ -665,13 +712,14 @@ textarea.form-input {
   background: none;
   cursor: pointer;
   font-family: var(--font-sans);
-  font-size: 14px;
+  font-size: 13px;
+  font-weight: 400;
   text-decoration: none;
 }
 
 .admin-nav a:hover, .admin-nav button:hover {
   color: var(--text);
-  border-color: var(--border);
+  border-color: rgba(255, 255, 255, 0.06);
   text-decoration: none;
 }
 
@@ -695,7 +743,17 @@ textarea.form-input {
   padding: 32px 16px;
   color: var(--muted);
   font-family: var(--font-sans);
-  font-size: 14px;
+  font-size: 13px;
+}
+
+/* ===== Focus Rings (global) ===== */
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid rgba(91, 45, 142, 0.25);
+  outline-offset: 2px;
 }
 
 /* ===== Responsive ===== */
@@ -735,8 +793,8 @@ textarea.form-input {
   }
 
   .section {
-    padding: 24px 18px;
-    margin: 16px 0;
+    padding: 28px 20px;
+    margin: 20px 0;
   }
 
   .grid2 {
@@ -752,17 +810,17 @@ textarea.form-input {
   }
 
   .postContent {
-    font-size: 16px;
+    font-size: 17px;
   }
 
   .admin-nav {
     gap: 4px;
-    font-size: 13px;
+    font-size: 12px;
   }
 
   .admin-nav a, .admin-nav button {
     padding: 6px 10px;
-    font-size: 13px;
+    font-size: 12px;
   }
 
   .stat-card .stat-value {
@@ -776,7 +834,7 @@ textarea.form-input {
   }
 
   .section {
-    padding: 18px 14px;
+    padding: 22px 16px;
   }
 
   .postRow {
@@ -785,7 +843,7 @@ textarea.form-input {
   }
 
   .latest a {
-    font-size: 15px;
+    font-size: 16px;
     padding: 10px 16px;
   }
 
@@ -798,8 +856,8 @@ textarea.form-input {
   }
 
   .postContent {
-    font-size: 15.5px;
-    line-height: 1.85;
+    font-size: 16px;
+    line-height: 1.9;
   }
 
   .postMeta {
