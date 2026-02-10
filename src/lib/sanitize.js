@@ -23,11 +23,27 @@ export function sanitizeRichHtml(dirtyHtml) {
       "a",
       "code",
       "pre",
-      "span"
+      "span",
+      "div"
     ],
     allowedAttributes: {
       a: ["href", "name", "target", "rel"],
-      span: ["style"]
+      span: ["style"],
+      p: ["class", "style"],
+      div: ["class"],
+      h3: ["class"],
+      li: ["class"]
+    },
+    allowedClasses: {
+      p: ["pdf-indent", "pdf-ref-entry", "ql-align-center", "ql-align-right", "ql-align-justify",
+          "ql-indent-1", "ql-indent-2", "ql-indent-3", "ql-indent-4", "ql-indent-5", "ql-indent-6", "ql-indent-7", "ql-indent-8"],
+      div: ["pdf-text"],
+      h3: ["pdf-ref-heading", "ql-align-center", "ql-align-right", "ql-align-justify"],
+      li: ["ql-indent-1", "ql-indent-2", "ql-indent-3", "ql-indent-4", "ql-indent-5", "ql-indent-6", "ql-indent-7", "ql-indent-8"]
+    },
+    allowedStyles: {
+      span: { "color": [/.*/], "background-color": [/.*/] },
+      p: { "text-align": [/^(center|right|justify|left)$/], "padding-left": [/.*/] }
     },
     allowedSchemes: ["http", "https", "mailto"],
     transformTags: {

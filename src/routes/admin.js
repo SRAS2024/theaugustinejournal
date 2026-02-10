@@ -355,6 +355,24 @@ router.get("/posts", requireAdmin, async (req, res, next) => {
   }
 });
 
+/* ---------- PDF text extraction (AJAX) ---------- */
+
+router.post("/posts/extract-pdf", requireAdmin, upload.single("pdfFile"), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: "No PDF file provided." });
+    }
+    const fileFullPath = path.join(getUploadsDir(), req.file.filename);
+    const dataBuffer = fs.readFileSync(fileFullPath);
+    const parsed = await pdfParse(dataBuffer);
+    const html = pdfTextToHtml((parsed.text || "").trim());
+    res.json({ html, filename: req.file.filename, pdfPath: `/uploads/${req.file.filename}` });
+  } catch (err) {
+    console.error("[extract-pdf]", err);
+    res.status(500).json({ error: "Failed to extract PDF text." });
+  }
+});
+
 /* ---------- Post create ---------- */
 
 router.get("/posts/new", requireAdmin, (_req, res) => {
@@ -390,17 +408,30 @@ router.post("/posts/create", requireAdmin, upload.single("pdfFile"), async (req,
     let pdfPath = null;
 
     if (contentMode === "PDF") {
-      if (!req.file) {
+      // Check for pre-extracted PDF path (from AJAX extraction workflow)
+      const existingPdfPath = String(req.body.pdfPath || "").trim();
+      const editedHtml = sanitizeRichHtml(String(req.body.contentHtml || ""));
+
+      if (req.file) {
+        // New file uploaded via form (fallback path)
+        const fileFullPath = path.join(getUploadsDir(), req.file.filename);
+        const dataBuffer = fs.readFileSync(fileFullPath);
+        const parsed = await pdfParse(dataBuffer);
+        contentType = "PDF";
+        contentHtml = editedHtml && editedHtml.replace(/<[^>]+>/g, "").trim().length
+          ? editedHtml
+          : pdfTextToHtml((parsed.text || "").trim());
+        pdfPath = `/uploads/${req.file.filename}`;
+      } else if (existingPdfPath && editedHtml.replace(/<[^>]+>/g, "").trim().length) {
+        // PDF was already uploaded via AJAX; admin edited the extracted text
+        contentType = "PDF";
+        contentHtml = editedHtml;
+        pdfPath = existingPdfPath;
+      } else {
         return res.status(400).render("admin/post-form", {
           mode: "create", post: null, error: "PDF file is required for PDF mode."
         });
       }
-      const fileFullPath = path.join(getUploadsDir(), req.file.filename);
-      const dataBuffer = fs.readFileSync(fileFullPath);
-      const parsed = await pdfParse(dataBuffer);
-      contentType = "PDF";
-      contentHtml = pdfTextToHtml((parsed.text || "").trim());
-      pdfPath = `/uploads/${req.file.filename}`;
     } else {
       const richHtml = sanitizeRichHtml(String(req.body.contentHtml || ""));
       if (!richHtml.replace(/<[^>]+>/g, "").trim().length) {
@@ -471,13 +502,28 @@ router.post("/posts/:id/update", requireAdmin, upload.single("pdfFile"), async (
 
     if (contentMode === "PDF") {
       contentType = "PDF";
+      const editedHtml = sanitizeRichHtml(String(req.body.contentHtml || ""));
+      const newPdfPath = String(req.body.pdfPath || "").trim();
+
       if (req.file) {
         deletePdfFile(existing.pdfPath);
         const fileFullPath = path.join(getUploadsDir(), req.file.filename);
         const dataBuffer = fs.readFileSync(fileFullPath);
         const parsed = await pdfParse(dataBuffer);
-        contentHtml = pdfTextToHtml((parsed.text || "").trim());
+        contentHtml = editedHtml && editedHtml.replace(/<[^>]+>/g, "").trim().length
+          ? editedHtml
+          : pdfTextToHtml((parsed.text || "").trim());
         pdfPath = `/uploads/${req.file.filename}`;
+      } else if (newPdfPath) {
+        // PDF uploaded via AJAX, previous PDF replaced
+        if (newPdfPath !== existing.pdfPath) deletePdfFile(existing.pdfPath);
+        pdfPath = newPdfPath;
+        if (editedHtml.replace(/<[^>]+>/g, "").trim().length) {
+          contentHtml = editedHtml;
+        }
+      } else if (editedHtml.replace(/<[^>]+>/g, "").trim().length) {
+        // No new file, but admin edited existing content
+        contentHtml = editedHtml;
       }
     } else {
       contentType = "RICH";

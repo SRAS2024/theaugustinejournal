@@ -4,6 +4,9 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title><%= mode === "create" ? "Create Post" : "Edit Post" %> | The Augustine Journal</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Inter:wght@300;400;500&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="/public/css/styles.css" />
     <link href="https://cdn.jsdelivr.net/npm/quill@1.3.7/dist/quill.snow.css" rel="stylesheet">
     <style>
@@ -20,6 +23,16 @@
       .ql-snow .ql-picker-label { color: var(--muted); }
       .ql-snow .ql-picker-options { background: #1a1a22; border-color: var(--border); }
       .ql-snow .ql-picker-item { color: var(--text); }
+      #pdfEditorWrap { display: none; margin-top: 16px; }
+      #pdfEditorWrap.visible { display: block; }
+      .pdf-extract-status {
+        font-family: var(--font-sans);
+        font-size: 12px;
+        color: var(--muted);
+        margin-top: 8px;
+        letter-spacing: 0.2px;
+      }
+      .pdf-extract-status.error { color: #e07070; }
     </style>
   </head>
   <body>
@@ -50,6 +63,7 @@
         <form id="postForm" method="POST" enctype="multipart/form-data"
           action="<%= mode === "create" ? "/admin/posts/create?_csrf=" + encodeURIComponent(csrfToken) : "/admin/posts/" + post.id + "/update?_csrf=" + encodeURIComponent(csrfToken) %>">
           <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
+          <input type="hidden" id="pdfPathInput" name="pdfPath" value="<%= post && post.pdfPath ? post.pdfPath : "" %>" />
 
           <div class="grid2">
             <div>
@@ -107,9 +121,16 @@
 
           <div id="pdfWrap" style="display:none;">
             <label class="form-label">PDF file</label>
-            <input name="pdfFile" type="file" accept="application/pdf" class="form-input" style="margin-top:6px;" />
+            <input id="pdfFileInput" name="pdfFile" type="file" accept="application/pdf" class="form-input" style="margin-top:6px;" />
             <div class="form-hint">
-              Required in PDF mode. The extracted text will display like a normal post. The original PDF remains accessible via a link.
+              Upload a PDF. Text will be extracted and placed into an editor below for formatting.
+            </div>
+            <div id="pdfExtractStatus" class="pdf-extract-status"></div>
+
+            <div id="pdfEditorWrap">
+              <label class="form-label" style="margin-top:16px;">Extracted content (edit below)</label>
+              <div id="pdfQuillEditor" style="margin-top:6px;"></div>
+              <div class="form-hint">Format the extracted text using the toolbar above. This will be saved as the post content.</div>
             </div>
           </div>
 
