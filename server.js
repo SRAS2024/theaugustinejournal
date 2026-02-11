@@ -183,9 +183,13 @@ async function start() {
     createTableIfMissing: true
   });
 
-  store.on("error", (err) => {
-    console.error("[session-store] Postgres session store error:", err?.message || err);
-  });
+  // Some connect-pg-simple versions do not expose an EventEmitter interface.
+  // Guard this so a missing .on does not hard crash startup.
+  if (store && typeof store.on === "function") {
+    store.on("error", (err) => {
+      console.error("[session-store] Postgres session store error:", err?.message || err);
+    });
+  }
 
   app.use(
     session({
