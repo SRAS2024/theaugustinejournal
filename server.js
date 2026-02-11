@@ -149,9 +149,10 @@ async function start() {
 
   app.set("pgPool", pgPool);
 
-  // Verify DB connectivity early with a timeout, before session store is attached.
+  // Verify DB connectivity early with retries so a brief Railway networking hiccup
+  // does not take the whole site down.
   console.log("[startup] Checking database connectivity ...");
-  await assertDbReachable(pgPool, 8000);
+  await assertDbReachableWithRetries(pgPool, { timeoutMs: 8000, attempts: 10, delayMs: 2000 });
   console.log("[startup] Database is reachable.");
 
   /* ---------- Database bootstrap ---------- */
@@ -274,4 +275,27 @@ async function assertDbReachable(pgPool, timeoutMs) {
     pgPool.query("SELECT 1"),
     new Promise((_, reject) => setTimeout(() => reject(timeoutErr), timeoutMs))
   ]);
+}
+
+async function assertDbReachableWithRetries(pgPool, { timeoutMs, attempts, delayMs }) {
+  let lastErr;
+
+  for (let i = 1; i <= attempts; i++) {
+    try {
+      await assertDbReachable(pgPool, timeoutMs);
+      return;
+    } catch (err) {
+      lastErr = err;
+      console.error(
+        `[startup] Database not reachable (attempt ${i}/${attempts}):`,
+        err?.message || err
+      );
+
+      if (i < attempts) {
+        await new Promise((r) => setTimeout(r, delayMs));
+      }
+    }
+  }
+
+  throw lastErr;
 }
