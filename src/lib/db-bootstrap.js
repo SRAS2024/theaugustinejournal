@@ -2,7 +2,7 @@
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
-import { execSync } from "child_process";
+import { exec } from "child_process";
 import { PrismaClient } from "@prisma/client";
 import { nanoid } from "nanoid";
 import { Client } from "pg";
@@ -25,12 +25,21 @@ function prismaCommand() {
 }
 
 function run(command) {
-  return execSync(command, {
-    cwd: PROJECT_ROOT,
-    env: { ...process.env },
-    stdio: "pipe",
-    shell: true
-  }).toString();
+  return new Promise((resolve, reject) => {
+    exec(command, {
+      cwd: PROJECT_ROOT,
+      env: { ...process.env },
+      shell: true,
+      timeout: 30_000
+    }, (err, stdout, stderr) => {
+      if (err) {
+        err.stdout = stdout;
+        err.stderr = stderr;
+        return reject(err);
+      }
+      resolve(stdout);
+    });
+  });
 }
 
 function sslForUrl(url) {
@@ -48,7 +57,7 @@ export async function expectedTablesExist() {
   const url = process.env.DATABASE_URL;
   if (!url) return false;
 
-  const client = new Client({ connectionString: url, ssl: sslForUrl(url) });
+  const client = new Client({ connectionString: url, ssl: sslForUrl(url), connectionTimeoutMillis: 10_000 });
   try {
     await client.connect();
     const result = await client.query(
@@ -80,11 +89,11 @@ async function ensureSchema() {
   // Step 1: Try prisma migrate deploy
   try {
     console.log("[bootstrap] Running prisma migrate deploy ...");
-    const out = run(`${prisma} migrate deploy`);
+    const out = await run(`${prisma} migrate deploy`);
     if (out?.trim()) console.log(out.trim());
   } catch (err) {
-    const stderr = err?.stderr?.toString() || "";
-    const stdout = err?.stdout?.toString() || "";
+    const stderr = err?.stderr?.toString?.() || err?.stderr || "";
+    const stdout = err?.stdout?.toString?.() || err?.stdout || "";
     console.warn("[bootstrap] migrate deploy failed:", (stdout + "\n" + stderr).trim() || err.message);
   }
 
@@ -99,11 +108,11 @@ async function ensureSchema() {
   // table is auto-recreated on every startup via createTableIfMissing: true.
   console.log("[bootstrap] Tables missing after migrate deploy. Running prisma db push --skip-generate --accept-data-loss ...");
   try {
-    const out = run(`${prisma} db push --skip-generate --accept-data-loss`);
+    const out = await run(`${prisma} db push --skip-generate --accept-data-loss`);
     if (out?.trim()) console.log(out.trim());
   } catch (err) {
-    const stderr = err?.stderr?.toString() || "";
-    const stdout = err?.stdout?.toString() || "";
+    const stderr = err?.stderr?.toString?.() || err?.stderr || "";
+    const stdout = err?.stdout?.toString?.() || err?.stdout || "";
     const msg = (stdout + "\n" + stderr).trim() || err.message;
     throw new Error(`prisma db push failed: ${msg}`);
   }

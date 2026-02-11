@@ -79,7 +79,7 @@ app.use(
 );
 
 /* ------------------------------------------------------------------ */
-/*  Common middleware                                                 */
+/*  Common middleware                                                  */
 /* ------------------------------------------------------------------ */
 
 app.use(morgan("combined"));
@@ -87,13 +87,7 @@ app.use(express.json({ limit: "1mb" }));
 app.use(express.urlencoded({ extended: true, limit: "2mb" }));
 app.use(cookieParser());
 
-/*
-  Serve public assets from the root as well as /public.
-  This ensures /favicon.ico and Apple touch icons work without needing a /public prefix.
-*/
-app.use(express.static(path.join(__dirname, "public"), { index: false }));
-app.use("/public", express.static(path.join(__dirname, "public"), { index: false }));
-
+app.use("/public", express.static(path.join(__dirname, "public")));
 app.use("/uploads", express.static(path.join(__dirname, "uploads"), { fallthrough: true }));
 
 app.set("trust proxy", 1);
@@ -107,22 +101,19 @@ app.get("/health", (_req, res) => {
 });
 
 /* ------------------------------------------------------------------ */
-/*  Gate: while DB is not ready, keep site responsive (no 502)         */
+/*  503 gate — while DB is not ready, keep the port responsive        */
 /* ------------------------------------------------------------------ */
 
 app.use((req, res, next) => {
   if (appReady) return next();
-
-  // Allow health checks and already served static assets
-  if (req.path === "/health") return next();
-
-  // If we are not ready, tell Railway and browsers we are warming up.
   res.setHeader("Retry-After", "5");
-  return res.status(503).send("Starting up. Please refresh in a moment.");
+  return res.status(503).send(
+    "The Augustine Journal is starting up. Please refresh in a moment."
+  );
 });
 
 /* ------------------------------------------------------------------ */
-/*  Listen immediately so Railway does not show 502                    */
+/*  Listen immediately so Railway sees an open port                   */
 /* ------------------------------------------------------------------ */
 
 app.listen(PORT, "0.0.0.0", () => {
@@ -130,19 +121,20 @@ app.listen(PORT, "0.0.0.0", () => {
 });
 
 /* ------------------------------------------------------------------ */
-/*  Background startup                                                */
+/*  Background startup (non-blocking)                                 */
 /* ------------------------------------------------------------------ */
 
 startBackground().catch((err) => {
-  console.error("[startup] Background start failed:", err);
-  // Keep appReady false so the gate continues returning 503.
+  console.error("[startup] Fatal error during background startup:", err);
 });
 
 async function startBackground() {
   if (!DATABASE_URL) {
-    console.error("[startup] DATABASE_URL is not set.");
+    console.error("[startup] DATABASE_URL is not set. App will stay in 503 mode.");
     return;
   }
+
+  /* ---------- Database pool ---------- */
 
   const disableSsl =
     DATABASE_URL.includes("sslmode=disable") ||
@@ -152,15 +144,13 @@ async function startBackground() {
   const pgPool = new Pool({
     connectionString: DATABASE_URL,
     ssl: disableSsl ? false : { rejectUnauthorized: false },
-    connectionTimeoutMillis: 8000,
-    idleTimeoutMillis: 30000
+    connectionTimeoutMillis: 10_000,
+    idleTimeoutMillis: 30_000
   });
 
   app.set("pgPool", pgPool);
 
-  console.log("[startup] Checking database connectivity ...");
-  await assertDbReachableWithRetries(pgPool, { timeoutMs: 8000, attempts: 10, delayMs: 2000 });
-  console.log("[startup] Database is reachable.");
+  /* ---------- Database bootstrap ---------- */
 
   console.log("[startup] Beginning database bootstrap ...");
 
@@ -171,28 +161,21 @@ async function startBackground() {
   } catch (e) {
     const msg = (e?.message || String(e) || "").slice(0, 2000);
     console.error("[startup] Bootstrap failed:", msg);
+    console.error("[startup] App will stay in 503 mode until restart.");
     return;
   }
 
-  /* ---------- Session store (after DB is confirmed ready) ---------- */
+  /* ---------- Session store ---------- */
 
   const PgStore = PgSession(session);
 
-  const store = new PgStore({
-    pool: pgPool,
-    tableName: "user_sessions",
-    createTableIfMissing: true
-  });
-
-  if (store && typeof store.on === "function") {
-    store.on("error", (err) => {
-      console.error("[session-store] Postgres session store error:", err?.message || err);
-    });
-  }
-
   app.use(
     session({
-      store,
+      store: new PgStore({
+        pool: pgPool,
+        tableName: "user_sessions",
+        createTableIfMissing: true
+      }),
       name: "taj.sid",
       secret: SESSION_SECRET,
       resave: false,
@@ -225,7 +208,7 @@ async function startBackground() {
 
   app.use(attachLocals);
 
-  /* ---------- Mount routes ---------- */
+  /* ---------- Mount routes (only after schema is verified) ---------- */
 
   const [{ default: publicRoutes }, { default: adminRoutes }, { default: apiRoutes }] =
     await Promise.all([
@@ -249,44 +232,12 @@ async function startBackground() {
       return res.status(503).send("Database schema is not ready yet. Please refresh in a moment.");
     }
 
-    if (err?.code === "ETIMEDOUT" || err?.code === "ECONNREFUSED") {
-      return res.status(503).send("Database connection issue. Please try again in a moment.");
-    }
-
     console.error(err);
     res.status(500).send("Something went wrong.");
   });
 
+  /* ---------- Ready ---------- */
+
   appReady = true;
-  console.log("[startup] App is ready.");
-}
-
-async function assertDbReachable(pgPool, timeoutMs) {
-  const timeoutErr = new Error(`Database connection timed out after ${timeoutMs}ms`);
-  timeoutErr.code = "ETIMEDOUT";
-
-  await Promise.race([
-    pgPool.query("SELECT 1"),
-    new Promise((_, reject) => setTimeout(() => reject(timeoutErr), timeoutMs))
-  ]);
-}
-
-async function assertDbReachableWithRetries(pgPool, { timeoutMs, attempts, delayMs }) {
-  let lastErr;
-
-  for (let i = 1; i <= attempts; i++) {
-    try {
-      await assertDbReachable(pgPool, timeoutMs);
-      return;
-    } catch (err) {
-      lastErr = err;
-      console.error(`[startup] Database not reachable (attempt ${i}/${attempts}):`, err?.message || err);
-
-      if (i < attempts) {
-        await new Promise((r) => setTimeout(r, delayMs));
-      }
-    }
-  }
-
-  throw lastErr;
+  console.log("[startup] App is fully ready.");
 }
