@@ -77,7 +77,7 @@ app.use(
 );
 
 /* ------------------------------------------------------------------ */
-/*  Common middleware                                                  */
+/*  Common middleware                                                 */
 /* ------------------------------------------------------------------ */
 
 app.use(morgan("combined"));
@@ -85,7 +85,13 @@ app.use(express.json({ limit: "1mb" }));
 app.use(express.urlencoded({ extended: true, limit: "2mb" }));
 app.use(cookieParser());
 
-app.use("/public", express.static(path.join(__dirname, "public")));
+/*
+  Serve public assets from the root as well as /public.
+  This ensures /favicon.ico and Apple touch icons work without needing a /public prefix.
+*/
+app.use(express.static(path.join(__dirname, "public"), { index: false }));
+app.use("/public", express.static(path.join(__dirname, "public"), { index: false }));
+
 app.use("/uploads", express.static(path.join(__dirname, "uploads"), { fallthrough: true }));
 
 app.set("trust proxy", 1);
@@ -99,12 +105,12 @@ app.get("/health", (_req, res) => {
 });
 
 /* ------------------------------------------------------------------ */
-/*  503 fallback — used when the database is not ready                */
+/*  503 fallback                                                      */
 /* ------------------------------------------------------------------ */
 
 function serve503(message) {
   app.use((req, res, _next) => {
-    if (req.path === "/health") return; // already handled above
+    if (req.path === "/health") return;
     res.status(503).send(message);
   });
 
@@ -121,7 +127,7 @@ if (!DATABASE_URL) {
   console.error("[startup] DATABASE_URL is not set.");
   serve503(
     "Server is running, but DATABASE_URL is not configured. " +
-    "Add a Postgres service or set DATABASE_URL."
+      "Add a Postgres service or set DATABASE_URL."
   );
 } else {
   start().catch((err) => {
@@ -131,10 +137,6 @@ if (!DATABASE_URL) {
 }
 
 async function start() {
-  /* ---------- Session store ---------- */
-
-  const PgStore = PgSession(session);
-
   const disableSsl =
     DATABASE_URL.includes("sslmode=disable") ||
     DATABASE_URL.includes("localhost") ||
@@ -147,13 +149,47 @@ async function start() {
 
   app.set("pgPool", pgPool);
 
+  // Verify DB connectivity early with a timeout, before session store is attached.
+  console.log("[startup] Checking database connectivity ...");
+  await assertDbReachable(pgPool, 8000);
+  console.log("[startup] Database is reachable.");
+
+  /* ---------- Database bootstrap ---------- */
+
+  console.log("[startup] Beginning database bootstrap ...");
+
+  try {
+    const { bootstrap } = await import("./src/lib/db-bootstrap.js");
+    const result = await bootstrap();
+    console.log("[startup] Bootstrap complete:", result);
+  } catch (e) {
+    const msg = (e?.message || String(e) || "").slice(0, 2000);
+    console.error("[startup] Bootstrap failed:", msg);
+
+    serve503(
+      "Database bootstrap failed. The site will be available once the database schema is ready.\n\n" +
+        msg
+    );
+    return;
+  }
+
+  /* ---------- Session store (after DB is confirmed ready) ---------- */
+
+  const PgStore = PgSession(session);
+
+  const store = new PgStore({
+    pool: pgPool,
+    tableName: "user_sessions",
+    createTableIfMissing: true
+  });
+
+  store.on("error", (err) => {
+    console.error("[session-store] Postgres session store error:", err?.message || err);
+  });
+
   app.use(
     session({
-      store: new PgStore({
-        pool: pgPool,
-        tableName: "user_sessions",
-        createTableIfMissing: true
-      }),
+      store,
       name: "taj.sid",
       secret: SESSION_SECRET,
       resave: false,
@@ -186,26 +222,7 @@ async function start() {
 
   app.use(attachLocals);
 
-  /* ---------- Database bootstrap ---------- */
-
-  console.log("[startup] Beginning database bootstrap ...");
-
-  try {
-    const { bootstrap } = await import("./src/lib/db-bootstrap.js");
-    const result = await bootstrap();
-    console.log("[startup] Bootstrap complete:", result);
-  } catch (e) {
-    const msg = (e?.message || String(e) || "").slice(0, 2000);
-    console.error("[startup] Bootstrap failed:", msg);
-
-    // Keep process alive for Railway health checks but refuse all other traffic.
-    serve503(
-      "Database bootstrap failed. The site will be available once the database schema is ready.\n\n" + msg
-    );
-    return;
-  }
-
-  /* ---------- Mount routes (only after schema is verified) ---------- */
+  /* ---------- Mount routes ---------- */
 
   const [{ default: publicRoutes }, { default: adminRoutes }, { default: apiRoutes }] =
     await Promise.all([
@@ -229,6 +246,11 @@ async function start() {
       return res.status(503).send("Database schema is not ready yet. Please refresh in a moment.");
     }
 
+    // If Postgres is temporarily unreachable, return 503 instead of 500.
+    if (err?.code === "ETIMEDOUT" || err?.code === "ECONNREFUSED") {
+      return res.status(503).send("Database connection issue. Please try again in a moment.");
+    }
+
     console.error(err);
     res.status(500).send("Something went wrong.");
   });
@@ -238,4 +260,14 @@ async function start() {
   app.listen(PORT, "0.0.0.0", () => {
     console.log(`The Augustine Journal running on port ${PORT}`);
   });
+}
+
+async function assertDbReachable(pgPool, timeoutMs) {
+  const timeoutErr = new Error(`Database connection timed out after ${timeoutMs}ms`);
+  timeoutErr.code = "ETIMEDOUT";
+
+  await Promise.race([
+    pgPool.query("SELECT 1"),
+    new Promise((_, reject) => setTimeout(() => reject(timeoutErr), timeoutMs))
+  ]);
 }
