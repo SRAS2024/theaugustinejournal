@@ -7,6 +7,27 @@
         </div>
       ` : ''}
 
+      <div class="home-illustration" aria-hidden="true">
+        <svg viewBox="0 0 200 80" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <!-- Church facade -->
+          <!-- Main body -->
+          <rect x="70" y="32" width="60" height="38" rx="1" stroke="currentColor" stroke-width="0.7" opacity="0.3"/>
+          <!-- Roof / pediment -->
+          <path d="M66 34 L100 12 L134 34" stroke="currentColor" stroke-width="0.7" stroke-linecap="round" stroke-linejoin="round" opacity="0.3"/>
+          <!-- Cross -->
+          <line x1="100" y1="4" x2="100" y2="12" stroke="currentColor" stroke-width="0.7" stroke-linecap="round" opacity="0.35"/>
+          <line x1="96.5" y1="7" x2="103.5" y2="7" stroke="currentColor" stroke-width="0.7" stroke-linecap="round" opacity="0.35"/>
+          <!-- Arched doorway -->
+          <path d="M92 70 L92 52 A8 8 0 0 1 108 52 L108 70" stroke="currentColor" stroke-width="0.7" stroke-linecap="round" opacity="0.25"/>
+          <!-- Left window -->
+          <path d="M78 50 A4 4 0 0 1 86 50 L86 58 L78 58 Z" stroke="currentColor" stroke-width="0.5" stroke-linecap="round" opacity="0.18"/>
+          <!-- Right window -->
+          <path d="M114 50 A4 4 0 0 1 122 50 L122 58 L114 58 Z" stroke="currentColor" stroke-width="0.5" stroke-linecap="round" opacity="0.18"/>
+          <!-- Ground line -->
+          <line x1="40" y1="70" x2="160" y2="70" stroke="currentColor" stroke-width="0.4" stroke-linecap="round" opacity="0.12"/>
+        </svg>
+      </div>
+
       <div class="about" data-translate="content" data-original="${(settings?.aboutHtml || '').replace(/<[^>]+>/g, '').replace(/"/g,'&quot;')}">
         ${settings?.aboutHtml || ''}
       </div>
