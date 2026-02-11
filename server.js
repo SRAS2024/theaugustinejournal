@@ -26,6 +26,8 @@ const PORT = process.env.PORT || 8080;
 const SESSION_SECRET = process.env.SESSION_SECRET || crypto.randomBytes(32).toString("hex");
 const DATABASE_URL = process.env.DATABASE_URL;
 
+let appReady = false;
+
 /* ------------------------------------------------------------------ */
 /*  View engine                                                       */
 /* ------------------------------------------------------------------ */
@@ -101,42 +103,47 @@ app.set("trust proxy", 1);
 /* ------------------------------------------------------------------ */
 
 app.get("/health", (_req, res) => {
-  res.status(200).send("ok");
+  res.status(200).send(appReady ? "ok" : "starting");
 });
 
 /* ------------------------------------------------------------------ */
-/*  503 fallback                                                      */
+/*  Gate: while DB is not ready, keep site responsive (no 502)         */
 /* ------------------------------------------------------------------ */
 
-function serve503(message) {
-  app.use((req, res, _next) => {
-    if (req.path === "/health") return;
-    res.status(503).send(message);
-  });
+app.use((req, res, next) => {
+  if (appReady) return next();
 
-  app.listen(PORT, "0.0.0.0", () => {
-    console.log(`The Augustine Journal running on port ${PORT} (503 fallback)`);
-  });
-}
+  // Allow health checks and already served static assets
+  if (req.path === "/health") return next();
+
+  // If we are not ready, tell Railway and browsers we are warming up.
+  res.setHeader("Retry-After", "5");
+  return res.status(503).send("Starting up. Please refresh in a moment.");
+});
 
 /* ------------------------------------------------------------------ */
-/*  Start                                                             */
+/*  Listen immediately so Railway does not show 502                    */
 /* ------------------------------------------------------------------ */
 
-if (!DATABASE_URL) {
-  console.error("[startup] DATABASE_URL is not set.");
-  serve503(
-    "Server is running, but DATABASE_URL is not configured. " +
-      "Add a Postgres service or set DATABASE_URL."
-  );
-} else {
-  start().catch((err) => {
-    console.error("[startup] Fatal boot error:", err);
-    serve503("Server failed to start due to a configuration error. Check logs.");
-  });
-}
+app.listen(PORT, "0.0.0.0", () => {
+  console.log(`The Augustine Journal listening on port ${PORT}`);
+});
 
-async function start() {
+/* ------------------------------------------------------------------ */
+/*  Background startup                                                */
+/* ------------------------------------------------------------------ */
+
+startBackground().catch((err) => {
+  console.error("[startup] Background start failed:", err);
+  // Keep appReady false so the gate continues returning 503.
+});
+
+async function startBackground() {
+  if (!DATABASE_URL) {
+    console.error("[startup] DATABASE_URL is not set.");
+    return;
+  }
+
   const disableSsl =
     DATABASE_URL.includes("sslmode=disable") ||
     DATABASE_URL.includes("localhost") ||
@@ -144,18 +151,16 @@ async function start() {
 
   const pgPool = new Pool({
     connectionString: DATABASE_URL,
-    ssl: disableSsl ? false : { rejectUnauthorized: false }
+    ssl: disableSsl ? false : { rejectUnauthorized: false },
+    connectionTimeoutMillis: 8000,
+    idleTimeoutMillis: 30000
   });
 
   app.set("pgPool", pgPool);
 
-  // Verify DB connectivity early with retries so a brief Railway networking hiccup
-  // does not take the whole site down.
   console.log("[startup] Checking database connectivity ...");
   await assertDbReachableWithRetries(pgPool, { timeoutMs: 8000, attempts: 10, delayMs: 2000 });
   console.log("[startup] Database is reachable.");
-
-  /* ---------- Database bootstrap ---------- */
 
   console.log("[startup] Beginning database bootstrap ...");
 
@@ -166,11 +171,6 @@ async function start() {
   } catch (e) {
     const msg = (e?.message || String(e) || "").slice(0, 2000);
     console.error("[startup] Bootstrap failed:", msg);
-
-    serve503(
-      "Database bootstrap failed. The site will be available once the database schema is ready.\n\n" +
-        msg
-    );
     return;
   }
 
@@ -184,8 +184,6 @@ async function start() {
     createTableIfMissing: true
   });
 
-  // Some connect-pg-simple versions do not expose an EventEmitter interface.
-  // Guard this so a missing .on does not hard crash startup.
   if (store && typeof store.on === "function") {
     store.on("error", (err) => {
       console.error("[session-store] Postgres session store error:", err?.message || err);
@@ -251,7 +249,6 @@ async function start() {
       return res.status(503).send("Database schema is not ready yet. Please refresh in a moment.");
     }
 
-    // If Postgres is temporarily unreachable, return 503 instead of 500.
     if (err?.code === "ETIMEDOUT" || err?.code === "ECONNREFUSED") {
       return res.status(503).send("Database connection issue. Please try again in a moment.");
     }
@@ -260,11 +257,8 @@ async function start() {
     res.status(500).send("Something went wrong.");
   });
 
-  /* ---------- Listen ---------- */
-
-  app.listen(PORT, "0.0.0.0", () => {
-    console.log(`The Augustine Journal running on port ${PORT}`);
-  });
+  appReady = true;
+  console.log("[startup] App is ready.");
 }
 
 async function assertDbReachable(pgPool, timeoutMs) {
@@ -286,10 +280,7 @@ async function assertDbReachableWithRetries(pgPool, { timeoutMs, attempts, delay
       return;
     } catch (err) {
       lastErr = err;
-      console.error(
-        `[startup] Database not reachable (attempt ${i}/${attempts}):`,
-        err?.message || err
-      );
+      console.error(`[startup] Database not reachable (attempt ${i}/${attempts}):`, err?.message || err);
 
       if (i < attempts) {
         await new Promise((r) => setTimeout(r, delayMs));
