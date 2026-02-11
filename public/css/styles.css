@@ -193,6 +193,22 @@ main.container {
   margin-top: 8px;
 }
 
+/* ===== Home Illustration ===== */
+.home-illustration {
+  display: flex;
+  justify-content: center;
+  margin: 20px auto 24px;
+  max-width: 240px;
+  color: var(--muted);
+  user-select: none;
+  pointer-events: none;
+}
+
+.home-illustration svg {
+  width: 100%;
+  height: auto;
+}
+
 /* ===== About ===== */
 .about {
   text-align: center;
@@ -797,6 +813,11 @@ textarea:focus-visible {
     margin: 20px 0;
   }
 
+  .home-illustration {
+    max-width: 180px;
+    margin: 16px auto 20px;
+  }
+
   .grid2 {
     grid-template-columns: 1fr;
   }
@@ -835,6 +856,11 @@ textarea:focus-visible {
 
   .section {
     padding: 22px 16px;
+  }
+
+  .home-illustration {
+    max-width: 140px;
+    margin: 12px auto 16px;
   }
 
   .postRow {
