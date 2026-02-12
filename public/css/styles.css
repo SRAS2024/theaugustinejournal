@@ -99,7 +99,7 @@ main.container {
   padding: 8px;
   position: absolute;
   right: 0;
-  top: 4px;
+  top: 0;
   z-index: 100;
 }
 
@@ -501,12 +501,13 @@ main.container {
   background: rgba(255, 255, 255, 0.06);
 }
 
-/* ── Post footer with PDF link ── */
+/* ── Post footer with PDF link and share ── */
 .postFooter {
   margin-top: 40px;
   padding-top: 20px;
   border-top: 1px solid var(--border);
-  text-align: left;
+  display: flex;
+  align-items: center;
 }
 
 .pdf-link {
@@ -522,6 +523,39 @@ main.container {
 .pdf-link:hover {
   color: var(--text);
   text-decoration: underline;
+}
+
+.postFooter-divider {
+  width: 1px;
+  height: 14px;
+  background: var(--border);
+  margin: 0 14px;
+  flex-shrink: 0;
+}
+
+.share-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--muted);
+  letter-spacing: 0.3px;
+  transition: color 0.2s;
+  white-space: nowrap;
+}
+
+.share-btn:hover {
+  color: var(--text);
+}
+
+.share-btn svg {
+  flex-shrink: 0;
 }
 
 /* ===== Footer ===== */
@@ -777,6 +811,10 @@ textarea:focus-visible {
   :root {
     --max-w: 100%;
     --max-w-wide: 100%;
+  }
+
+  .topbar {
+    padding-bottom: 14px;
   }
 
   .container {
