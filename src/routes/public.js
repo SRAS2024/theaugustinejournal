@@ -107,4 +107,63 @@ router.get("/post/:slug", async (req, res, next) => {
   }
 });
 
+/* ------------------------------------------------------------------ */
+/*  Sitemap                                                           */
+/* ------------------------------------------------------------------ */
+
+router.get("/sitemap.xml", async (req, res, next) => {
+  try {
+    const prisma = getPrisma();
+    const siteUrl = (process.env.SITE_URL || "https://theaugustinejournal.com").replace(/\/+$/, "");
+
+    const posts = await safeQuery(
+      () =>
+        prisma.post.findMany({
+          select: { slug: true, updatedAt: true },
+          orderBy: [{ postDate: "desc" }, { createdAt: "desc" }]
+        }),
+      []
+    );
+
+    const staticPages = ["/", "/blog", "/essays", "/letters"];
+
+    let xml = '<?xml version="1.0" encoding="UTF-8"?>\n';
+    xml += '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n';
+
+    for (const page of staticPages) {
+      xml += `  <url><loc>${siteUrl}${page}</loc></url>\n`;
+    }
+
+    for (const post of posts) {
+      const lastmod = post.updatedAt.toISOString().split("T")[0];
+      xml += "  <url>\n";
+      xml += `    <loc>${siteUrl}/post/${post.slug}</loc>\n`;
+      xml += `    <lastmod>${lastmod}</lastmod>\n`;
+      xml += "  </url>\n";
+    }
+
+    xml += "</urlset>";
+
+    res.set("Content-Type", "application/xml");
+    res.send(xml);
+  } catch (err) {
+    next(err);
+  }
+});
+
+/* ------------------------------------------------------------------ */
+/*  Robots.txt                                                        */
+/* ------------------------------------------------------------------ */
+
+router.get("/robots.txt", (_req, res) => {
+  const lines = [
+    "User-agent: *",
+    "Disallow: /admin",
+    "",
+    "Sitemap: https://theaugustinejournal.com/sitemap.xml"
+  ];
+  res.set("Content-Type", "text/plain");
+  res.send(lines.join("\n"));
+});
+
 export default router;
