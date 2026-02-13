@@ -70,24 +70,32 @@
               pdfPathInput.value = data.pdfPath || "";
             }
 
-            if (pdfExtractStatus) {
-              pdfExtractStatus.textContent = "Text extracted. Edit the content below.";
-              pdfExtractStatus.classList.remove("error");
-            }
+            // Determine whether the editor is already visible and has content
+            var editorAlreadyVisible = pdfEditorWrap && pdfEditorWrap.classList.contains("visible");
+            var editorHasContent = window._pdfQuill && window._pdfQuill.getText().trim().length > 0;
 
-            // Show the PDF editor and load content
+            // Show the PDF editor
             if (pdfEditorWrap) {
               pdfEditorWrap.classList.add("visible");
             }
 
-            // Load extracted HTML into the PDF Quill editor
-            if (window._pdfQuill) {
+            // Only auto-insert extracted text when the editor was not visible
+            // yet or when it is visible but empty. If the editor already
+            // contains text, preserve the existing content untouched.
+            if (window._pdfQuill && (!editorAlreadyVisible || !editorHasContent)) {
               // Strip the pdf-text wrapper div if present — inject plain paragraphs
               var html = data.html || "";
               var tmp = document.createElement("div");
               tmp.innerHTML = html;
               var inner = tmp.querySelector(".pdf-text");
               window._pdfQuill.clipboard.dangerouslyPasteHTML(inner ? inner.innerHTML : html);
+            }
+
+            if (pdfExtractStatus) {
+              pdfExtractStatus.textContent = (editorAlreadyVisible && editorHasContent)
+                ? "PDF replaced. Existing content preserved."
+                : "Text extracted. Edit the content below.";
+              pdfExtractStatus.classList.remove("error");
             }
 
             // Clear the file input so the form doesn't re-upload the file
