@@ -101,6 +101,23 @@ app.get("/health", (_req, res) => {
 });
 
 /* ------------------------------------------------------------------ */
+/*  Canonical host + HTTPS enforcement                                */
+/* ------------------------------------------------------------------ */
+
+app.use((req, res, next) => {
+  const host = req.hostname;
+  const proto = req.protocol;
+
+  if (host === "www.theaugustinejournal.com") {
+    return res.redirect(301, `https://theaugustinejournal.com${req.originalUrl}`);
+  }
+  if (host === "theaugustinejournal.com" && proto === "http") {
+    return res.redirect(301, `https://theaugustinejournal.com${req.originalUrl}`);
+  }
+  next();
+});
+
+/* ------------------------------------------------------------------ */
 /*  503 gate — while DB is not ready, keep the port responsive        */
 /* ------------------------------------------------------------------ */
 
