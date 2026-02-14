@@ -4,7 +4,9 @@
     home: { en: "Home", pt: "Inicio", es: "Inicio", fr: "Accueil", de: "Startseite", it: "Home" },
     blog: { en: "Blog", pt: "Blog", es: "Blog", fr: "Blog", de: "Blog", it: "Blog" },
     essays: { en: "Essays", pt: "Ensaios", es: "Ensayos", fr: "Essais", de: "Essays", it: "Saggi" },
+    essay: { en: "Essay", pt: "Ensaio", es: "Ensayo", fr: "Essai", de: "Essay", it: "Saggio" },
     letters: { en: "Letters", pt: "Cartas", es: "Cartas", fr: "Lettres", de: "Briefe", it: "Lettere" },
+    letter: { en: "Letter", pt: "Carta", es: "Carta", fr: "Lettre", de: "Brief", it: "Lettera" },
     checkLatest: {
       en: "Check out our latest post",
       pt: "Confira nossa publicacao mais recente",
