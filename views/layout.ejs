@@ -16,6 +16,12 @@
     <link rel="stylesheet" href="/public/css/styles.css" />
   </head>
   <body>
+    <svg aria-hidden="true" style="position:absolute;width:0;height:0;overflow:hidden">
+      <filter id="grain-filter" color-interpolation-filters="linearRGB">
+        <feTurbulence type="fractalNoise" baseFrequency="0.75" numOctaves="4" stitchTiles="stitch" />
+        <feColorMatrix type="saturate" values="0" />
+      </filter>
+    </svg>
     <div id="google_translate_element"></div>
 
     <%- include("partials/header", { active }) %>
