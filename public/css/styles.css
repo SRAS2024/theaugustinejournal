@@ -51,6 +51,105 @@ button, input, select, textarea { font: inherit; color: inherit; }
 body { top: 0 !important; }
 #google_translate_element { position: absolute; left: -9999px; opacity: 0; pointer-events: none; }
 
+/* ===== Language Selector ===== */
+.lang-selector {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  margin-left: 2px;
+}
+
+.lang-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 7px 12px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 400;
+  letter-spacing: 0.3px;
+  transition: color 0.2s, border-color 0.2s, background 0.2s;
+  white-space: nowrap;
+}
+
+.lang-toggle:hover {
+  color: var(--text);
+  border-color: rgba(255, 255, 255, 0.06);
+}
+
+.lang-toggle svg {
+  flex-shrink: 0;
+  opacity: 0.7;
+}
+
+.lang-code {
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.5px;
+}
+
+.lang-dropdown {
+  display: none;
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  min-width: 170px;
+  max-height: 320px;
+  overflow-y: auto;
+  background: var(--bg2);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5), 0 2px 8px rgba(0, 0, 0, 0.3);
+  z-index: 1000;
+  padding: 4px 0;
+}
+
+.lang-selector.open .lang-dropdown {
+  display: block;
+}
+
+.lang-dropdown a {
+  display: block;
+  padding: 8px 14px;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--muted);
+  text-decoration: none;
+  transition: color 0.15s, background 0.15s;
+  letter-spacing: 0.2px;
+}
+
+.lang-dropdown a:hover {
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.04);
+  text-decoration: none;
+}
+
+.lang-dropdown a.active {
+  color: var(--text);
+  background: var(--purple-soft);
+  font-weight: 500;
+}
+
+.lang-dropdown::-webkit-scrollbar {
+  width: 4px;
+}
+
+.lang-dropdown::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.lang-dropdown::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 2px;
+}
+
 /* ===== Layout ===== */
 .container {
   width: 100%;
@@ -844,6 +943,18 @@ textarea:focus-visible {
   .nav a {
     text-align: center;
     padding: 10px 16px;
+  }
+
+  .lang-selector {
+    justify-content: center;
+    margin-left: 0;
+    margin-top: 4px;
+  }
+
+  .lang-dropdown {
+    right: auto;
+    left: 50%;
+    transform: translateX(-50%);
   }
 
   .section {
