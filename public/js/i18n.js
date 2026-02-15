@@ -1,43 +1,7 @@
 (function () {
   "use strict";
 
-  var STORAGE_KEY = "taj_preferred_lang";
   var SITE_LANG = "en";
-
-  /* ===== Supported languages (displayed in selector) ===== */
-  var languages = {
-    en: "English",
-    pt: "Portugu\u00eas",
-    es: "Espa\u00f1ol",
-    fr: "Fran\u00e7ais",
-    de: "Deutsch",
-    it: "Italiano",
-    nl: "Nederlands",
-    pl: "Polski",
-    ru: "\u0420\u0443\u0441\u0441\u043a\u0438\u0439",
-    ja: "\u65e5\u672c\u8a9e",
-    ko: "\ud55c\uad6d\uc5b4",
-    zh: "\u4e2d\u6587",
-    ar: "\u0627\u0644\u0639\u0631\u0628\u064a\u0629",
-    hi: "\u0939\u093f\u0928\u094d\u0926\u0940",
-    tr: "T\u00fcrk\u00e7e",
-    sv: "Svenska",
-    da: "Dansk",
-    no: "Norsk",
-    fi: "Suomi",
-    el: "\u0395\u03bb\u03bb\u03b7\u03bd\u03b9\u03ba\u03ac",
-    cs: "\u010ce\u0161tina",
-    ro: "Rom\u00e2n\u0103",
-    hu: "Magyar",
-    uk: "\u0423\u043a\u0440\u0430\u0457\u043d\u0441\u044c\u043a\u0430",
-    th: "\u0e44\u0e17\u0e22",
-    vi: "Ti\u1ebfng Vi\u1ec7t",
-    id: "Bahasa Indonesia",
-    ms: "Bahasa Melayu",
-    tl: "Filipino",
-    sw: "Kiswahili",
-    he: "\u05e2\u05d1\u05e8\u05d9\u05ea"
-  };
 
   /* ===== UI string translations (static labels) ===== */
   var ui = {
@@ -75,18 +39,11 @@
   };
 
   /* ===== Language detection ===== */
-  function getPreferredLang() {
-    var stored = localStorage.getItem(STORAGE_KEY);
-    if (stored && languages[stored]) return stored;
-
-    var browserLang = (navigator.language || navigator.userLanguage || "en")
+  function getDeviceLang() {
+    var lang = (navigator.language || navigator.userLanguage || "en")
       .toLowerCase()
       .split("-")[0];
-    return browserLang;
-  }
-
-  function setPreferredLang(lang) {
-    localStorage.setItem(STORAGE_KEY, lang);
+    return lang;
   }
 
   /* ===== Translate static UI labels using built-in dictionaries ===== */
@@ -206,78 +163,6 @@
     }
   }
 
-  /* ===== Language selector UI ===== */
-  function buildLanguageSelector() {
-    var currentLang = getPreferredLang();
-    var wrapper = document.getElementById("langSelector");
-    if (!wrapper) return;
-
-    /* Globe icon */
-    var globeSvg =
-      '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
-      'stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">' +
-      '<circle cx="12" cy="12" r="10"/>' +
-      '<path d="M2 12h20"/>' +
-      '<path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>' +
-      "</svg>";
-
-    /* Toggle button */
-    var btn = document.createElement("button");
-    btn.className = "lang-toggle";
-    btn.setAttribute("aria-label", "Change language");
-    btn.setAttribute("type", "button");
-    btn.innerHTML =
-      globeSvg + ' <span class="lang-code">' + currentLang.toUpperCase() + "</span>";
-
-    /* Dropdown */
-    var dropdown = document.createElement("div");
-    dropdown.className = "lang-dropdown";
-
-    var keys = Object.keys(languages);
-    for (var i = 0; i < keys.length; i++) {
-      (function (code) {
-        var item = document.createElement("a");
-        item.href = "#";
-        item.setAttribute("data-lang", code);
-        item.textContent = languages[code];
-        if (code === currentLang) item.classList.add("active");
-        item.addEventListener("click", function (e) {
-          e.preventDefault();
-          e.stopPropagation();
-          switchLanguage(code);
-        });
-        dropdown.appendChild(item);
-      })(keys[i]);
-    }
-
-    /* Toggle dropdown */
-    btn.addEventListener("click", function (e) {
-      e.stopPropagation();
-      var isOpen = wrapper.classList.contains("open");
-      wrapper.classList.toggle("open", !isOpen);
-    });
-
-    /* Close on outside click */
-    document.addEventListener("click", function () {
-      wrapper.classList.remove("open");
-    });
-
-    /* Prevent dropdown clicks from closing */
-    dropdown.addEventListener("click", function (e) {
-      e.stopPropagation();
-    });
-
-    wrapper.appendChild(btn);
-    wrapper.appendChild(dropdown);
-  }
-
-  function switchLanguage(lang) {
-    setPreferredLang(lang);
-    setTranslateCookies(lang);
-    /* Reload to let Google Translate pick up the new cookie */
-    location.reload();
-  }
-
   /* ===== Set HTML lang attribute ===== */
   function setHtmlLang(lang) {
     document.documentElement.setAttribute("lang", lang);
@@ -285,13 +170,10 @@
 
   /* ===== Init on DOMContentLoaded ===== */
   document.addEventListener("DOMContentLoaded", function () {
-    var lang = getPreferredLang();
+    var lang = getDeviceLang();
 
     /* Set HTML lang attribute */
     setHtmlLang(lang);
-
-    /* Build the language selector in the header */
-    buildLanguageSelector();
 
     /* Translate static UI strings from the built-in dictionary */
     translateUiStrings(lang);
