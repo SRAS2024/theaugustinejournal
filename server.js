@@ -18,6 +18,20 @@ import { attachLocals } from "./src/middleware/attachLocals.js";
 
 dotenv.config();
 
+/* ------------------------------------------------------------------ */
+/*  Validate required admin credentials                               */
+/* ------------------------------------------------------------------ */
+
+const missingVars = ["ADMIN_USERNAME", "ADMIN_PASSWORD"].filter(
+  (key) => !process.env[key]
+);
+if (missingVars.length) {
+  throw new Error(
+    `Missing required environment variable(s): ${missingVars.join(", ")}. ` +
+    "Set them in a .env file (local) or as Railway Variables (production)."
+  );
+}
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
