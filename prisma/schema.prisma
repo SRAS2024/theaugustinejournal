@@ -48,3 +48,12 @@ model Post {
   @@index([type, postDate])
   @@index([postDate])
 }
+
+model PdfFile {
+  id        String   @id
+  filename  String   @unique
+  data      Bytes
+  mimeType  String   @default("application/pdf")
+  size      Int
+  createdAt DateTime @default(now())
+}

@@ -1,5 +1,6 @@
 // server.js
 import crypto from "crypto";
+import fs from "fs";
 import express from "express";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -88,7 +89,32 @@ app.use(express.urlencoded({ extended: true, limit: "2mb" }));
 app.use(cookieParser());
 
 app.use("/public", express.static(path.join(__dirname, "public")));
+// Serve PDFs: try filesystem first (for freshly uploaded files), then fall
+// back to the database so that PDFs survive ephemeral-filesystem redeployments.
 app.use("/uploads", express.static(path.join(__dirname, "uploads"), { fallthrough: true }));
+app.get("/uploads/:filename", async (req, res) => {
+  try {
+    const { getPrisma } = await import("./src/lib/db.js");
+    const prisma = getPrisma();
+    const record = await prisma.pdfFile.findUnique({
+      where: { filename: req.params.filename }
+    });
+    if (!record) return res.status(404).send("File not found.");
+
+    // Re-create the file on disk so future requests are served by express.static
+    const uploadsDir = path.join(__dirname, "uploads");
+    if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
+    fs.writeFileSync(path.join(uploadsDir, record.filename), record.data);
+
+    res.set("Content-Type", record.mimeType);
+    res.set("Content-Length", record.size);
+    res.set("Cache-Control", "public, max-age=86400");
+    res.send(Buffer.from(record.data));
+  } catch (err) {
+    console.error("[uploads] Error serving PDF from database:", err.message);
+    res.status(500).send("Error loading file.");
+  }
+});
 
 app.set("trust proxy", 1);
 
