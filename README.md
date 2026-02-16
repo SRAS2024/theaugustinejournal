@@ -171,8 +171,7 @@ npm run dev
 ## Admin Access
 
 - **URL:** `/admin`
-- **Username:** `SRAS0920`
-- **Password:** `Santidade`
+- **Credentials:** Set via the `ADMIN_USERNAME` and `ADMIN_PASSWORD` environment variables.
 
 After login, a 3-second welcome animation plays before redirecting to the dashboard.
 

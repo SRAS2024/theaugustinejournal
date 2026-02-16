@@ -210,7 +210,7 @@ router.post("/login", async (req, res) => {
   const ok = await verifyAdminPassword(password);
   if (!ok) return res.status(401).render("admin/login", { error: "Invalid credentials." });
 
-  req.session.admin = { isLoggedIn: true, name: "Ryan" };
+  req.session.admin = { isLoggedIn: true, name: process.env.ADMIN_USERNAME };
   res.redirect("/admin/welcome");
 });
 
