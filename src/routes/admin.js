@@ -164,6 +164,33 @@ function deletePdfFile(pdfPath) {
   if (fs.existsSync(fsPath)) fs.unlinkSync(fsPath);
 }
 
+async function savePdfToDb(filename, filePath) {
+  const prisma = getPrisma();
+  const data = fs.readFileSync(filePath);
+  await prisma.pdfFile.upsert({
+    where: { filename },
+    update: { data, size: data.length },
+    create: {
+      id: nanoid(),
+      filename,
+      data,
+      mimeType: "application/pdf",
+      size: data.length
+    }
+  });
+}
+
+async function deletePdfFromDb(pdfPath) {
+  if (!pdfPath) return;
+  const filename = path.basename(pdfPath);
+  const prisma = getPrisma();
+  try {
+    await prisma.pdfFile.delete({ where: { filename } });
+  } catch {
+    // Record may not exist yet (uploaded before this feature was added)
+  }
+}
+
 /* ------------------------------------------------------------------ */
 /*  Auth routes (no admin session required)                           */
 /* ------------------------------------------------------------------ */
@@ -366,6 +393,10 @@ router.post("/posts/extract-pdf", requireAdmin, upload.single("pdfFile"), async 
     const dataBuffer = fs.readFileSync(fileFullPath);
     const parsed = await pdfParse(dataBuffer);
     const html = pdfTextToHtml((parsed.text || "").trim());
+
+    // Persist PDF binary in the database so it survives redeployments
+    await savePdfToDb(req.file.filename, fileFullPath);
+
     res.json({ html, filename: req.file.filename, pdfPath: `/uploads/${req.file.filename}` });
   } catch (err) {
     console.error("[extract-pdf]", err);
@@ -422,6 +453,8 @@ router.post("/posts/create", requireAdmin, upload.single("pdfFile"), async (req,
           ? editedHtml
           : pdfTextToHtml((parsed.text || "").trim());
         pdfPath = `/uploads/${req.file.filename}`;
+        // Persist PDF binary in the database so it survives redeployments
+        await savePdfToDb(req.file.filename, fileFullPath);
       } else if (existingPdfPath && editedHtml.replace(/<[^>]+>/g, "").trim().length) {
         // PDF was already uploaded via AJAX; admin edited the extracted text
         contentType = "PDF";
@@ -506,6 +539,7 @@ router.post("/posts/:id/update", requireAdmin, upload.single("pdfFile"), async (
       const newPdfPath = String(req.body.pdfPath || "").trim();
 
       if (req.file) {
+        await deletePdfFromDb(existing.pdfPath);
         deletePdfFile(existing.pdfPath);
         const fileFullPath = path.join(getUploadsDir(), req.file.filename);
         const dataBuffer = fs.readFileSync(fileFullPath);
@@ -514,9 +548,14 @@ router.post("/posts/:id/update", requireAdmin, upload.single("pdfFile"), async (
           ? editedHtml
           : pdfTextToHtml((parsed.text || "").trim());
         pdfPath = `/uploads/${req.file.filename}`;
+        // Persist PDF binary in the database so it survives redeployments
+        await savePdfToDb(req.file.filename, fileFullPath);
       } else if (newPdfPath) {
         // PDF uploaded via AJAX, previous PDF replaced
-        if (newPdfPath !== existing.pdfPath) deletePdfFile(existing.pdfPath);
+        if (newPdfPath !== existing.pdfPath) {
+          await deletePdfFromDb(existing.pdfPath);
+          deletePdfFile(existing.pdfPath);
+        }
         pdfPath = newPdfPath;
         if (editedHtml.replace(/<[^>]+>/g, "").trim().length) {
           contentHtml = editedHtml;
@@ -534,6 +573,7 @@ router.post("/posts/:id/update", requireAdmin, upload.single("pdfFile"), async (
         });
       }
       contentHtml = richHtml;
+      await deletePdfFromDb(existing.pdfPath);
       deletePdfFile(existing.pdfPath);
       pdfPath = null;
     }
@@ -565,6 +605,7 @@ router.post("/posts/:id/delete", requireAdmin, async (req, res, next) => {
     const prisma = getPrisma();
     const post = await prisma.post.findUnique({ where: { id: req.params.id } });
     if (!post) return res.redirect("/admin/posts");
+    await deletePdfFromDb(post.pdfPath);
     deletePdfFile(post.pdfPath);
     await prisma.post.delete({ where: { id: req.params.id } });
     res.redirect("/admin/posts?saved=true");
