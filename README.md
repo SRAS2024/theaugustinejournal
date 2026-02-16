@@ -4,7 +4,7 @@ A clean, professional journal and blog platform built with Node.js, Express, and
 
 **Live site:** [https://theaugustinejournal.up.railway.app](https://theaugustinejournal.up.railway.app)
 
-**Custom domain:** [augustinejournal.com](https://augustinejournal.com)
+**Custom domain:** [theaugustinejournal.com](https://theaugustinejournal.com)
 
 ---
 
@@ -138,7 +138,7 @@ npm start           # npx prisma db push && node prisma/seed.js && node server.j
 
 ### Custom Domain
 
-Configure `augustinejournal.com` in Railway project settings under the Networking tab.
+Configure `theaugustinejournal.com` in Railway project settings under the Networking tab.
 
 ---
 
