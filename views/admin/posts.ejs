@@ -1,8 +1,9 @@
 <!doctype html>
-<html lang="en">
+<html lang="<%= typeof detectedLang !== 'undefined' ? detectedLang : 'en' %>" translate="yes">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="detected-lang" content="<%= typeof detectedLang !== 'undefined' ? detectedLang : 'en' %>" />
     <meta name="robots" content="noindex, nofollow" />
     <title>Posts | The Augustine Journal</title>
     <link rel="icon" href="/public/icons/favicon.ico" sizes="48x48" />
@@ -17,15 +18,15 @@
   <body>
     <header class="topbar">
       <div class="container header-inner">
-        <h1 class="brand"><a href="/admin/dashboard" style="color:inherit;text-decoration:none;">The Augustine Journal</a></h1>
+        <h1 class="brand notranslate"><a href="/admin/dashboard" style="color:inherit;text-decoration:none;">The Augustine Journal</a></h1>
         <nav class="admin-nav">
-          <a href="/">View Site</a>
-          <a href="/admin/dashboard">Dashboard</a>
-          <a href="/admin/posts" class="active">Posts</a>
-          <a href="/admin/settings">Site Settings</a>
+          <a href="/" data-i18n="viewSite">View Site</a>
+          <a href="/admin/dashboard" data-i18n="dashboard">Dashboard</a>
+          <a href="/admin/posts" class="active" data-i18n="posts">Posts</a>
+          <a href="/admin/settings" data-i18n="siteSettings">Site Settings</a>
           <form method="POST" action="/admin/logout" style="display:inline;margin:0;">
             <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
-            <button type="submit">Log out</button>
+            <button type="submit" data-i18n="logOut">Log out</button>
           </form>
         </nav>
       </div>
@@ -33,22 +34,22 @@
 
     <main class="container">
       <section class="section card">
-        <h2 class="listTitle">Posts</h2>
+        <h2 class="listTitle" data-i18n="posts">Posts</h2>
 
         <% if (saved) { %>
-          <div class="alert-success">Changes saved successfully.</div>
+          <div class="alert-success" data-i18n="changesSaved">Changes saved successfully.</div>
         <% } %>
 
         <div style="display:flex;justify-content:center;gap:8px;flex-wrap:wrap;margin-bottom:18px;">
-          <a class="btn <%= filter === 'ALL' ? 'primary' : '' %>" href="/admin/posts?type=ALL">All</a>
-          <a class="btn <%= filter === 'BLOG' ? 'primary' : '' %>" href="/admin/posts?type=BLOG">Blog</a>
-          <a class="btn <%= filter === 'ESSAY' ? 'primary' : '' %>" href="/admin/posts?type=ESSAY">Essays</a>
-          <a class="btn <%= filter === 'LETTER' ? 'primary' : '' %>" href="/admin/posts?type=LETTER">Letters</a>
-          <a class="btn primary" href="/admin/posts/new">Create Post</a>
+          <a class="btn <%= filter === 'ALL' ? 'primary' : '' %>" href="/admin/posts?type=ALL" data-i18n="all">All</a>
+          <a class="btn <%= filter === 'BLOG' ? 'primary' : '' %>" href="/admin/posts?type=BLOG" data-i18n="blog">Blog</a>
+          <a class="btn <%= filter === 'ESSAY' ? 'primary' : '' %>" href="/admin/posts?type=ESSAY" data-i18n="essays">Essays</a>
+          <a class="btn <%= filter === 'LETTER' ? 'primary' : '' %>" href="/admin/posts?type=LETTER" data-i18n="letters">Letters</a>
+          <a class="btn primary" href="/admin/posts/new" data-i18n="createPost">Create Post</a>
         </div>
 
         <% if (!posts || posts.length === 0) { %>
-          <div class="empty-state">No posts yet.</div>
+          <div class="empty-state" data-i18n="noPostsYet">No posts yet.</div>
         <% } %>
 
         <div style="display:grid;gap:8px;">
@@ -59,17 +60,17 @@
                   <a href="/post/<%= p.slug %>" target="_blank" rel="noopener noreferrer"><%= p.title %></a>
                 </div>
                 <div class="muted" style="margin-top:6px;font-size:12px;">
-                  <%= p.type === 'BLOG' ? 'Blog' : (p.type === 'ESSAY' ? 'Essay' : 'Letter') %> ·
-                  <%= new Date(p.postDate).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' }) %> ·
-                  <%= p.contentType === 'PDF' ? 'PDF' : 'Editor' %>
+                  <span data-i18n="<%= p.type === 'BLOG' ? 'blog' : (p.type === 'ESSAY' ? 'essay' : 'letter') %>"><%= p.type === 'BLOG' ? 'Blog' : (p.type === 'ESSAY' ? 'Essay' : 'Letter') %></span> &middot;
+                  <%= new Date(p.postDate).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' }) %> &middot;
+                  <span data-i18n="<%= p.contentType === 'PDF' ? '' : 'editor' %>"><%= p.contentType === 'PDF' ? 'PDF' : 'Editor' %></span>
                 </div>
               </div>
 
               <div style="display:flex;gap:8px;align-items:center;flex-shrink:0;">
-                <a class="btn" href="/admin/posts/<%= p.id %>/edit">Edit</a>
-                <form method="POST" action="/admin/posts/<%= p.id %>/delete" onsubmit="return confirm('Delete this post?');" style="margin:0;">
+                <a class="btn" href="/admin/posts/<%= p.id %>/edit" data-i18n="edit">Edit</a>
+                <form method="POST" action="/admin/posts/<%= p.id %>/delete" data-i18n-confirm="deletePostConfirm" onsubmit="return confirm('Delete this post?');" style="margin:0;">
                   <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
-                  <button class="btn danger" type="submit">Delete</button>
+                  <button class="btn danger" type="submit" data-i18n="delete_">Delete</button>
                 </form>
               </div>
             </div>
@@ -77,5 +78,7 @@
         </div>
       </section>
     </main>
+
+    <script src="/public/js/i18n.js"></script>
   </body>
 </html>
