@@ -1,8 +1,9 @@
 <!doctype html>
-<html lang="en" translate="yes">
+<html lang="<%= typeof detectedLang !== 'undefined' ? detectedLang : 'en' %>" translate="yes">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="detected-lang" content="<%= typeof detectedLang !== 'undefined' ? detectedLang : 'en' %>" />
     <meta name="theme-color" content="#0a0a0e" />
     <meta name="description" content="The Augustine Journal, thoughtful reflection and discourse." />
     <title><%= title %></title>

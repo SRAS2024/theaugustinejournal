@@ -1,8 +1,9 @@
 <!doctype html>
-<html lang="en">
+<html lang="<%= typeof detectedLang !== 'undefined' ? detectedLang : 'en' %>" translate="yes">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="detected-lang" content="<%= typeof detectedLang !== 'undefined' ? detectedLang : 'en' %>" />
     <meta name="robots" content="noindex, nofollow" />
     <title>Dashboard | The Augustine Journal</title>
     <link rel="icon" href="/public/icons/favicon.ico" sizes="48x48" />
@@ -17,15 +18,15 @@
   <body>
     <header class="topbar">
       <div class="container header-inner">
-        <h1 class="brand"><a href="/admin/dashboard" style="color:inherit;text-decoration:none;">The Augustine Journal</a></h1>
+        <h1 class="brand notranslate"><a href="/admin/dashboard" style="color:inherit;text-decoration:none;">The Augustine Journal</a></h1>
         <nav class="admin-nav">
-          <a href="/">View Site</a>
-          <a href="/admin/dashboard" class="active">Dashboard</a>
-          <a href="/admin/posts">Posts</a>
-          <a href="/admin/settings">Site Settings</a>
+          <a href="/" data-i18n="viewSite">View Site</a>
+          <a href="/admin/dashboard" class="active" data-i18n="dashboard">Dashboard</a>
+          <a href="/admin/posts" data-i18n="posts">Posts</a>
+          <a href="/admin/settings" data-i18n="siteSettings">Site Settings</a>
           <form method="POST" action="/admin/logout" style="display:inline;margin:0;">
             <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
-            <button type="submit">Log out</button>
+            <button type="submit" data-i18n="logOut">Log out</button>
           </form>
         </nav>
       </div>
@@ -33,41 +34,43 @@
 
     <main class="container">
       <section class="section card">
-        <h2 class="listTitle">Dashboard</h2>
+        <h2 class="listTitle" data-i18n="dashboard">Dashboard</h2>
 
         <% if (saved) { %>
-          <div class="alert-success">Changes saved successfully.</div>
+          <div class="alert-success" data-i18n="changesSaved">Changes saved successfully.</div>
         <% } %>
 
         <div class="grid2" style="margin-bottom:20px;">
           <div class="stat-card">
-            <div class="stat-label">Total Posts</div>
+            <div class="stat-label" data-i18n="totalPosts">Total Posts</div>
             <div class="stat-value"><%= postCount %></div>
           </div>
           <div class="stat-card">
-            <div class="stat-label">Blog Posts</div>
+            <div class="stat-label" data-i18n="blogPosts">Blog Posts</div>
             <div class="stat-value"><%= blogCount %></div>
           </div>
           <div class="stat-card">
-            <div class="stat-label">Essays</div>
+            <div class="stat-label" data-i18n="essays">Essays</div>
             <div class="stat-value"><%= essayCount %></div>
           </div>
           <div class="stat-card">
-            <div class="stat-label">Letters</div>
+            <div class="stat-label" data-i18n="letters">Letters</div>
             <div class="stat-value"><%= letterCount %></div>
           </div>
           <div class="stat-card">
-            <div class="stat-label">Notices</div>
+            <div class="stat-label" data-i18n="notices">Notices</div>
             <div class="stat-value"><%= (notices || []).length %> / 3</div>
           </div>
         </div>
 
         <div style="display:flex;justify-content:center;gap:10px;flex-wrap:wrap;">
-          <a class="btn primary" href="/admin/posts/new">Create Post</a>
-          <a class="btn" href="/admin/posts">Manage Posts</a>
-          <a class="btn" href="/admin/settings">Site Settings</a>
+          <a class="btn primary" href="/admin/posts/new" data-i18n="createPost">Create Post</a>
+          <a class="btn" href="/admin/posts" data-i18n="managePosts">Manage Posts</a>
+          <a class="btn" href="/admin/settings" data-i18n="siteSettings">Site Settings</a>
         </div>
       </section>
     </main>
+
+    <script src="/public/js/i18n.js"></script>
   </body>
 </html>

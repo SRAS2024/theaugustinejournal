@@ -1,8 +1,9 @@
 <!doctype html>
-<html lang="en">
+<html lang="<%= typeof detectedLang !== 'undefined' ? detectedLang : 'en' %>" translate="yes">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="detected-lang" content="<%= typeof detectedLang !== 'undefined' ? detectedLang : 'en' %>" />
     <meta name="robots" content="noindex, nofollow" />
     <title>Welcome | The Augustine Journal</title>
     <link rel="icon" href="/public/icons/favicon.ico" sizes="48x48" />
@@ -17,17 +18,17 @@
   <body>
     <header class="topbar">
       <div class="container header-inner">
-        <h1 class="brand">The Augustine Journal</h1>
+        <h1 class="brand notranslate">The Augustine Journal</h1>
         <div class="admin-nav">
-          <span class="muted">Administrative Site</span>
+          <span class="muted" data-i18n="adminSite">Administrative Site</span>
         </div>
       </div>
     </header>
 
     <main class="container" style="max-width:520px;">
       <section class="section card" style="text-align:center;">
-        <h2 class="listTitle" style="margin-bottom:4px;">Welcome, <%= adminName || "Ryan" %>!</h2>
-        <p class="muted" style="margin-bottom:24px;">Loading your dashboard&hellip;</p>
+        <h2 class="listTitle" style="margin-bottom:4px;"><span data-i18n="welcome">Welcome,</span> <span class="notranslate"><%= adminName || "Ryan" %></span>!</h2>
+        <p class="muted" style="margin-bottom:24px;" data-i18n="loadingDashboard">Loading your dashboard&hellip;</p>
 
         <!-- Loading circle -->
         <div style="display:flex;justify-content:center;margin-bottom:24px;">
@@ -51,6 +52,7 @@
       </section>
     </main>
 
+    <script src="/public/js/i18n.js"></script>
     <script>
       (function() {
         var bar = document.getElementById('loadBar');

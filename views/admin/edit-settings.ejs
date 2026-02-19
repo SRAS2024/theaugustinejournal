@@ -1,8 +1,9 @@
 <!doctype html>
-<html lang="en">
+<html lang="<%= typeof detectedLang !== 'undefined' ? detectedLang : 'en' %>" translate="yes">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="detected-lang" content="<%= typeof detectedLang !== 'undefined' ? detectedLang : 'en' %>" />
     <meta name="robots" content="noindex, nofollow" />
     <title>Site Settings | The Augustine Journal</title>
     <link rel="icon" href="/public/icons/favicon.ico" sizes="48x48" />
@@ -17,15 +18,15 @@
   <body>
     <header class="topbar">
       <div class="container header-inner">
-        <h1 class="brand">The Augustine Journal</h1>
+        <h1 class="brand notranslate">The Augustine Journal</h1>
         <nav class="admin-nav">
-          <a href="/">View Site</a>
-          <a href="/admin/dashboard">Dashboard</a>
-          <a href="/admin/posts">Posts</a>
-          <a href="/admin/settings" class="active">Site Settings</a>
+          <a href="/" data-i18n="viewSite">View Site</a>
+          <a href="/admin/dashboard" data-i18n="dashboard">Dashboard</a>
+          <a href="/admin/posts" data-i18n="posts">Posts</a>
+          <a href="/admin/settings" class="active" data-i18n="siteSettings">Site Settings</a>
           <form method="POST" action="/admin/logout" style="display:inline;margin:0;">
             <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
-            <button type="submit">Log out</button>
+            <button type="submit" data-i18n="logOut">Log out</button>
           </form>
         </nav>
       </div>
@@ -33,20 +34,20 @@
 
     <main class="container">
       <section class="section card">
-        <h2 class="listTitle">Site Settings</h2>
+        <h2 class="listTitle" data-i18n="siteSettings">Site Settings</h2>
 
         <% if (saved) { %>
-          <div class="alert-success">Changes saved successfully.</div>
+          <div class="alert-success" data-i18n="changesSaved">Changes saved successfully.</div>
         <% } %>
 
         <!-- About Text -->
         <div style="margin-bottom:28px;">
-          <label class="form-label" style="font-size:14px;margin-bottom:10px;">Home Page Text</label>
+          <label class="form-label" style="font-size:14px;margin-bottom:10px;" data-i18n="homePageText">Home Page Text</label>
 
           <form method="POST" action="/admin/settings">
             <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
             <textarea name="aboutHtml" rows="6" class="form-input" style="margin-bottom:12px;"><%= settings?.aboutHtml || '' %></textarea>
-            <button class="btn primary" type="submit">Save</button>
+            <button class="btn primary" type="submit" data-i18n="save">Save</button>
           </form>
         </div>
 
@@ -54,7 +55,7 @@
 
         <!-- Notices -->
         <div>
-          <label class="form-label" style="font-size:14px;margin-bottom:10px;">Notices (max 3)</label>
+          <label class="form-label" style="font-size:14px;margin-bottom:10px;" data-i18n="noticesMax3">Notices (max 3)</label>
 
           <div style="display:grid;gap:10px;margin-bottom:14px;">
             <% (notices || []).forEach(function(n) { %>
@@ -62,12 +63,12 @@
                 <form method="POST" action="/admin/notices/<%= n.id %>/update" style="flex:1;display:flex;gap:8px;align-items:center;margin:0;">
                   <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
                   <input name="message" value="<%= n.message %>" required class="form-input" />
-                  <button class="btn" type="submit">Save</button>
+                  <button class="btn" type="submit" data-i18n="save">Save</button>
                 </form>
 
-                <form method="POST" action="/admin/notices/<%= n.id %>/delete" style="margin:0;" onsubmit="return confirm('Delete this notice?');">
+                <form method="POST" action="/admin/notices/<%= n.id %>/delete" style="margin:0;" data-i18n-confirm="deleteNoticeConfirm" onsubmit="return confirm('Delete this notice?');">
                   <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
-                  <button class="btn danger" type="submit">Delete</button>
+                  <button class="btn danger" type="submit" data-i18n="delete_">Delete</button>
                 </form>
               </div>
             <% }) %>
@@ -76,14 +77,16 @@
           <% if ((notices || []).length < 3) { %>
             <form method="POST" action="/admin/notices/add" style="display:flex;gap:8px;align-items:center;">
               <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
-              <input name="message" placeholder="Add a notice&hellip;" required class="form-input" />
-              <button class="btn primary" type="submit" style="white-space:nowrap;">Add Notice</button>
+              <input name="message" data-i18n-placeholder="addNoticePlaceholder" placeholder="Add a notice&hellip;" required class="form-input" />
+              <button class="btn primary" type="submit" style="white-space:nowrap;" data-i18n="addNotice">Add Notice</button>
             </form>
           <% } else { %>
-            <div class="muted" style="text-align:center;font-size:13px;">Maximum of 3 notices reached.</div>
+            <div class="muted" style="text-align:center;font-size:13px;" data-i18n="maxNoticesReached">Maximum of 3 notices reached.</div>
           <% } %>
         </div>
       </section>
     </main>
+
+    <script src="/public/js/i18n.js"></script>
   </body>
 </html>
