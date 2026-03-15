@@ -34,19 +34,35 @@ model Notice {
 }
 
 model Post {
-  id          String      @id
-  slug        String      @unique
-  type        PostType
-  title       String
-  postDate    DateTime    @default(now())
-  contentType ContentType
-  contentHtml String      @default("")
-  pdfPath     String?     @db.Text
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
+  id                 String      @id
+  slug               String      @unique
+  type               PostType
+  title              String
+  postDate           DateTime    @default(now())
+  contentType        ContentType
+  contentHtml        String      @default("")
+  pdfPath            String?     @db.Text
+  viewCount          Int         @default(0) @map("view_count")
+  autoTranslateTitle Boolean     @default(true) @map("auto_translate_title")
+  createdAt          DateTime    @default(now())
+  updatedAt          DateTime    @updatedAt
+
+  views PostView[]
 
   @@index([type, postDate])
   @@index([postDate])
+}
+
+model PostView {
+  id               String   @id
+  postId           String   @map("post_id")
+  viewerIdentifier String   @map("viewer_identifier")
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@unique([postId, viewerIdentifier])
+  @@map("post_views")
 }
 
 model PdfFile {

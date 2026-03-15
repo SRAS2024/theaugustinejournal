@@ -11,7 +11,7 @@
     <div class="postRow">
       <div>
         <p class="title">
-          <a href="/post/${p.slug}" data-translate="content" data-original="${String(p.title || "").replace(/"/g, "&quot;")}">${p.title}</a>
+          <a href="/post/${p.slug}"${p.autoTranslateTitle === false ? ' class="notranslate"' : ''} ${p.autoTranslateTitle !== false ? ' data-translate="content"' : ''} data-original="${String(p.title || "").replace(/"/g, "&quot;")}">${p.title}</a>
         </p>
         <div class="date">${formatDate(p.postDate)}</div>
       </div>

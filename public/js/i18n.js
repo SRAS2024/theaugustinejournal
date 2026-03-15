@@ -107,6 +107,14 @@
       de: "Formatieren Sie den extrahierten Text mit der Symbolleiste oben. Dieser wird als Beitragsinhalt gespeichert.",
       it: "Formatta il testo estratto utilizzando la barra degli strumenti sopra. Verr\u00e0 salvato come contenuto dell'articolo."
     },
+    autoTranslateTitle: {
+      en: "Auto Translation for Title",
+      pt: "Tradu\u00e7\u00e3o Autom\u00e1tica do T\u00edtulo",
+      es: "Traducci\u00f3n Autom\u00e1tica del T\u00edtulo",
+      fr: "Traduction Automatique du Titre",
+      de: "Automatische Titel\u00fcbersetzung",
+      it: "Traduzione Automatica del Titolo"
+    },
     save:     { en: "Save",   pt: "Salvar",    es: "Guardar",    fr: "Enregistrer",  de: "Speichern",  it: "Salva" },
     cancel:   { en: "Cancel", pt: "Cancelar",  es: "Cancelar",   fr: "Annuler",      de: "Abbrechen",  it: "Annulla" },
     required: { en: "Required", pt: "Obrigat\u00f3rio", es: "Obligatorio", fr: "Obligatoire", de: "Erforderlich", it: "Obbligatorio" },
