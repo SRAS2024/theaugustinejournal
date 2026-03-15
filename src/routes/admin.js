@@ -421,7 +421,10 @@ router.post("/posts/create", requireAdmin, upload.single("pdfFile"), async (req,
     const title = String(req.body.title || "").trim();
     const postDateRaw = String(req.body.postDate || "").trim();
     const contentMode = String(req.body.contentMode || "RICH");
-    const autoTranslateTitle = req.body.autoTranslateTitle === "true";
+    const autoTranslateRaw = req.body.autoTranslateTitle;
+    const autoTranslateTitle = Array.isArray(autoTranslateRaw)
+      ? autoTranslateRaw.includes("true")
+      : autoTranslateRaw === "true";
 
     if (!type || !ALLOWED_POST_TYPES.includes(type)) {
       return res.status(400).render("admin/post-form", { mode: "create", post: null, error: "Choose a post type." });
@@ -517,7 +520,10 @@ router.post("/posts/:id/update", requireAdmin, upload.single("pdfFile"), async (
     const title = String(req.body.title || "").trim();
     const postDateRaw = String(req.body.postDate || "").trim();
     const contentMode = String(req.body.contentMode || (existing.contentType === "PDF" ? "PDF" : "RICH"));
-    const autoTranslateTitle = req.body.autoTranslateTitle === "true";
+    const autoTranslateRaw = req.body.autoTranslateTitle;
+    const autoTranslateTitle = Array.isArray(autoTranslateRaw)
+      ? autoTranslateRaw.includes("true")
+      : autoTranslateRaw === "true";
 
     if (!type || !ALLOWED_POST_TYPES.includes(type)) {
       return res.status(400).render("admin/post-form", { mode: "edit", post: existing, error: "Choose a post type." });
