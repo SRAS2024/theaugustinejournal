@@ -409,7 +409,7 @@ router.post("/posts/extract-pdf", requireAdmin, upload.single("pdfFile"), async 
 router.get("/posts/new", requireAdmin, (_req, res) => {
   res.render("admin/post-form", {
     mode: "create",
-    post: { type: "BLOG", postDate: new Date().toISOString().slice(0, 10) },
+    post: { type: "BLOG", postDate: new Date().toISOString().slice(0, 10), autoTranslateTitle: true },
     error: ""
   });
 });
@@ -421,6 +421,7 @@ router.post("/posts/create", requireAdmin, upload.single("pdfFile"), async (req,
     const title = String(req.body.title || "").trim();
     const postDateRaw = String(req.body.postDate || "").trim();
     const contentMode = String(req.body.contentMode || "RICH");
+    const autoTranslateTitle = req.body.autoTranslateTitle === "true";
 
     if (!type || !ALLOWED_POST_TYPES.includes(type)) {
       return res.status(400).render("admin/post-form", { mode: "create", post: null, error: "Choose a post type." });
@@ -480,7 +481,7 @@ router.post("/posts/create", requireAdmin, upload.single("pdfFile"), async (req,
     if (collision) slug = `${slug}-${nanoid(6)}`;
 
     await prisma.post.create({
-      data: { id: nanoid(), slug, type, title, postDate, contentType, contentHtml, pdfPath }
+      data: { id: nanoid(), slug, type, title, postDate, contentType, contentHtml, pdfPath, autoTranslateTitle }
     });
 
     res.redirect("/admin/posts?saved=true");
@@ -516,6 +517,7 @@ router.post("/posts/:id/update", requireAdmin, upload.single("pdfFile"), async (
     const title = String(req.body.title || "").trim();
     const postDateRaw = String(req.body.postDate || "").trim();
     const contentMode = String(req.body.contentMode || (existing.contentType === "PDF" ? "PDF" : "RICH"));
+    const autoTranslateTitle = req.body.autoTranslateTitle === "true";
 
     if (!type || !ALLOWED_POST_TYPES.includes(type)) {
       return res.status(400).render("admin/post-form", { mode: "edit", post: existing, error: "Choose a post type." });
@@ -587,7 +589,7 @@ router.post("/posts/:id/update", requireAdmin, upload.single("pdfFile"), async (
 
     await prisma.post.update({
       where: { id },
-      data: { slug: newSlug, type, title, postDate, contentType, contentHtml, pdfPath }
+      data: { slug: newSlug, type, title, postDate, contentType, contentHtml, pdfPath, autoTranslateTitle }
     });
 
     res.redirect("/admin/posts?saved=true");

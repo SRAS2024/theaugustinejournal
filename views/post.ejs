@@ -19,7 +19,7 @@
   const body = `
     <section class="postShell">
       <header class="postHeader">
-        <h1 class="postTitle" data-translate="content" data-original="${String(post.title || "").replace(/"/g, "&quot;")}">${post.title}</h1>
+        <h1 class="postTitle${post.autoTranslateTitle === false ? ' notranslate' : ''}"${post.autoTranslateTitle !== false ? ' data-translate="content"' : ''} data-original="${String(post.title || "").replace(/"/g, "&quot;")}">${post.title}</h1>
         <div class="postMeta">
           <span class="postType" data-i18n="${typeKey}">${typeLabel}</span>
           <span class="postMetaSep">&mdash;</span>

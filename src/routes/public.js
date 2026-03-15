@@ -1,5 +1,7 @@
 // src/routes/public.js
 import { Router } from "express";
+import crypto from "crypto";
+import { nanoid } from "nanoid";
 import { getPrisma } from "../lib/db.js";
 
 const router = Router();
@@ -101,6 +103,32 @@ router.get("/post/:slug", async (req, res, next) => {
       null
     );
     if (!post) return res.status(404).send("Post not found.");
+
+    // Track unique view (fire-and-forget, don't block response)
+    try {
+      const ip = req.headers["x-forwarded-for"]?.split(",")[0]?.trim() || req.ip || "unknown";
+      const ua = req.headers["user-agent"] || "";
+      const viewerIdentifier = crypto.createHash("sha256").update(`${ip}:${ua}`).digest("hex");
+
+      const existing = await prisma.postView.findUnique({
+        where: { postId_viewerIdentifier: { postId: post.id, viewerIdentifier } }
+      });
+
+      if (!existing) {
+        await prisma.$transaction([
+          prisma.postView.create({
+            data: { id: nanoid(), postId: post.id, viewerIdentifier }
+          }),
+          prisma.post.update({
+            where: { id: post.id },
+            data: { viewCount: { increment: 1 } }
+          })
+        ]);
+      }
+    } catch {
+      // View tracking should never break the page
+    }
+
     res.render("post", { settings, notices, post });
   } catch (err) {
     next(err);

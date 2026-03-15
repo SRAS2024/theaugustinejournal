@@ -31,6 +31,45 @@
       .ql-snow .ql-picker-item { color: var(--text); }
       #pdfEditorWrap { display: none; margin-top: 16px; }
       #pdfEditorWrap.visible { display: block; }
+      /* Apple-style toggle switch */
+      .toggle-switch {
+        position: relative;
+        display: inline-block;
+        width: 44px;
+        height: 24px;
+        flex-shrink: 0;
+        cursor: pointer;
+      }
+      .toggle-switch input[type="checkbox"] {
+        opacity: 0;
+        width: 0;
+        height: 0;
+        position: absolute;
+      }
+      .toggle-slider {
+        position: absolute;
+        inset: 0;
+        background: rgba(255,255,255,0.15);
+        border-radius: 12px;
+        transition: background 0.3s ease;
+      }
+      .toggle-slider::before {
+        content: "";
+        position: absolute;
+        width: 18px;
+        height: 18px;
+        left: 3px;
+        top: 3px;
+        background: #fff;
+        border-radius: 50%;
+        transition: transform 0.3s ease;
+      }
+      .toggle-switch input[type="checkbox"]:checked + .toggle-slider {
+        background: var(--purple);
+      }
+      .toggle-switch input[type="checkbox"]:checked + .toggle-slider::before {
+        transform: translateX(20px);
+      }
       .pdf-extract-status {
         font-family: var(--font-sans);
         font-size: 12px;
@@ -94,6 +133,16 @@
               <label class="form-label" data-i18n="title">Title</label>
               <input name="title" type="text" required class="form-input" value="<%= post ? post.title : "" %>" />
               <div class="form-hint" data-i18n="required">Required</div>
+
+              <div class="auto-translate-toggle" style="display:flex;align-items:center;gap:10px;margin-top:12px;">
+                <label class="toggle-switch" for="autoTranslateTitle">
+                  <input type="hidden" name="autoTranslateTitle" value="false" />
+                  <input type="checkbox" id="autoTranslateTitle" name="autoTranslateTitle" value="true"
+                    <%= (!post || post.autoTranslateTitle !== false) ? "checked" : "" %> />
+                  <span class="toggle-slider"></span>
+                </label>
+                <span style="font-family:var(--font-sans);font-size:13px;color:var(--muted);" data-i18n="autoTranslateTitle">Auto Translation for Title</span>
+              </div>
             </div>
 
             <div>
