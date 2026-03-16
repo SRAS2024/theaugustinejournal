@@ -669,6 +669,13 @@ main.container {
   white-space: pre-line;
   line-height: 1.6;
 }
+.modal-post-name {
+  font-family: var(--font-serif);
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--text);
+  margin: 0 0 8px;
+}
 .modal-actions {
   display: flex;
   justify-content: center;
