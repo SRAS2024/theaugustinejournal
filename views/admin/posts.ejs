@@ -69,16 +69,100 @@
 
               <div style="display:flex;gap:8px;align-items:center;flex-shrink:0;">
                 <a class="btn" href="/admin/posts/<%= p.id %>/edit" data-i18n="edit">Edit</a>
-                <form method="POST" action="/admin/posts/<%= p.id %>/delete" data-i18n-confirm="deletePostConfirm" onsubmit="return confirm('Delete this post?');" style="margin:0;">
-                  <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
-                  <button class="btn danger" type="submit" data-i18n="delete_">Delete</button>
-                </form>
+                <button class="btn danger" type="button" data-i18n="delete_"
+                  onclick="openDeleteConfirm('<%= p.id %>', '<%= p.title.replace(/'/g, "\\'").replace(/"/g, "&quot;") %>')"
+                >Delete</button>
               </div>
             </div>
           <% }) %>
         </div>
       </section>
     </main>
+
+    <!-- Delete Confirmation Modal -->
+    <div class="modal-overlay" id="deleteConfirmModal">
+      <div class="modal-box">
+        <p class="modal-message" id="deleteConfirmMessage"></p>
+        <div class="modal-actions">
+          <button class="btn" type="button" onclick="closeDeleteConfirm()">Cancel</button>
+          <button class="btn danger" type="button" id="deleteConfirmBtn" onclick="openPasswordModal()">Delete</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Password Confirmation Modal -->
+    <div class="modal-overlay" id="passwordModal">
+      <div class="modal-box">
+        <p class="modal-message">Please enter administrative password</p>
+        <input type="password" class="form-input" id="adminPasswordInput" autocomplete="off" />
+        <p class="modal-error" id="passwordError">Incorrect password.</p>
+        <div class="modal-actions">
+          <button class="btn" type="button" onclick="closePasswordModal()">Cancel</button>
+          <button class="btn danger" type="button" onclick="confirmDeleteWithPassword()">Confirm</button>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      var deletePostId = null;
+      var csrfToken = '<%= csrfToken %>';
+
+      function openDeleteConfirm(postId, postTitle) {
+        deletePostId = postId;
+        document.getElementById('deleteConfirmMessage').textContent =
+          'Are you sure you want to delete this post?\n\n' + postTitle;
+        document.getElementById('deleteConfirmModal').classList.add('active');
+      }
+
+      function closeDeleteConfirm() {
+        document.getElementById('deleteConfirmModal').classList.remove('active');
+        deletePostId = null;
+      }
+
+      function openPasswordModal() {
+        document.getElementById('deleteConfirmModal').classList.remove('active');
+        document.getElementById('adminPasswordInput').value = '';
+        document.getElementById('passwordError').style.display = 'none';
+        document.getElementById('passwordModal').classList.add('active');
+        document.getElementById('adminPasswordInput').focus();
+      }
+
+      function closePasswordModal() {
+        document.getElementById('passwordModal').classList.remove('active');
+        deletePostId = null;
+      }
+
+      function confirmDeleteWithPassword() {
+        var password = document.getElementById('adminPasswordInput').value;
+        var btn = document.querySelector('#passwordModal .btn.danger');
+        btn.disabled = true;
+        btn.textContent = '...';
+
+        fetch('/admin/posts/' + deletePostId + '/delete', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ _csrf: csrfToken, password: password })
+        }).then(function(res) {
+          return res.json();
+        }).then(function(data) {
+          if (data.success) {
+            window.location.href = '/admin/posts?saved=true';
+          } else {
+            document.getElementById('passwordError').style.display = 'block';
+            btn.disabled = false;
+            btn.textContent = 'Confirm';
+          }
+        }).catch(function() {
+          document.getElementById('passwordError').style.display = 'block';
+          btn.disabled = false;
+          btn.textContent = 'Confirm';
+        });
+      }
+
+      document.getElementById('adminPasswordInput').addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') confirmDeleteWithPassword();
+      });
+    </script>
 
     <script src="/public/js/i18n.js"></script>
   </body>

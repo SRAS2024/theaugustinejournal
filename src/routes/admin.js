@@ -610,13 +610,18 @@ router.post("/posts/:id/update", requireAdmin, upload.single("pdfFile"), async (
 
 router.post("/posts/:id/delete", requireAdmin, async (req, res, next) => {
   try {
+    const { password } = req.body;
+    if (!password || !(await verifyAdminPassword(password))) {
+      return res.status(401).json({ success: false, error: "Incorrect password." });
+    }
+
     const prisma = getPrisma();
     const post = await prisma.post.findUnique({ where: { id: req.params.id } });
-    if (!post) return res.redirect("/admin/posts");
+    if (!post) return res.status(404).json({ success: false, error: "Post not found." });
     await deletePdfFromDb(post.pdfPath);
     deletePdfFile(post.pdfPath);
     await prisma.post.delete({ where: { id: req.params.id } });
-    res.redirect("/admin/posts?saved=true");
+    res.json({ success: true });
   } catch (err) {
     if (isTableMissingError(err)) return res.status(503).send(SCHEMA_NOT_READY);
     next(err);

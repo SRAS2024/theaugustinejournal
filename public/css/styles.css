@@ -639,6 +639,53 @@ main.container {
   border-color: rgba(200, 50, 50, 0.35);
 }
 
+/* ===== Modal ===== */
+.modal-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  z-index: 1000;
+  align-items: center;
+  justify-content: center;
+}
+.modal-overlay.active {
+  display: flex;
+}
+.modal-box {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 28px 32px;
+  max-width: 420px;
+  width: 90%;
+  text-align: center;
+}
+.modal-message {
+  font-family: var(--font-sans);
+  font-size: 14px;
+  color: var(--text);
+  margin: 0 0 20px;
+  white-space: pre-line;
+  line-height: 1.6;
+}
+.modal-actions {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 20px;
+}
+.modal-error {
+  display: none;
+  color: #e07070;
+  font-family: var(--font-sans);
+  font-size: 12px;
+  margin: 8px 0 0;
+}
+.modal-box .form-input {
+  margin-top: 12px;
+}
+
 /* ===== Grid ===== */
 .grid2 {
   display: grid;
