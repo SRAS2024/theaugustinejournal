@@ -43,6 +43,7 @@ model Post {
   contentHtml        String      @default("")
   pdfPath            String?     @db.Text
   viewCount          Int         @default(0) @map("view_count")
+  shareCount         Int         @default(0) @map("share_count")
   autoTranslateTitle Boolean     @default(true) @map("auto_translate_title")
   createdAt          DateTime    @default(now())
   updatedAt          DateTime    @updatedAt

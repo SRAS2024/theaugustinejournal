@@ -39,7 +39,15 @@
              <span class="postFooter-divider"></span>`
           : ""
         }
-        <button class="share-btn" id="shareBtn" aria-label="Share this post" type="button">
+        <span class="post-stats">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+          <span>${post.viewCount || 0}</span>
+          <span class="postFooter-divider"></span>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
+          <span id="shareCount">${post.shareCount || 0}</span>
+        </span>
+        <span style="flex:1;"></span>
+        <button class="share-btn" id="shareBtn" aria-label="Share this post" type="button" data-post-id="${post.id}">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
           <span data-i18n="share">Share</span>
         </button>
@@ -50,15 +58,35 @@
     (function() {
       var btn = document.getElementById('shareBtn');
       if (!btn) return;
+      var postId = btn.getAttribute('data-post-id');
+      var shareCountEl = document.getElementById('shareCount');
+
+      var csrfMeta = document.querySelector('meta[name="csrf-token"]');
+      var csrfToken = csrfMeta ? csrfMeta.getAttribute('content') : '';
+
+      function trackShare() {
+        fetch('/api/posts/' + encodeURIComponent(postId) + '/share', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-csrf-token': csrfToken }
+        }).then(function(res) { return res.json(); }).then(function(data) {
+          if (data.success && shareCountEl) {
+            shareCountEl.textContent = data.shareCount;
+          }
+        }).catch(function() {});
+      }
+
       btn.addEventListener('click', function() {
         var shareData = {
           title: document.title,
           url: window.location.href
         };
         if (navigator.share) {
-          navigator.share(shareData).catch(function() {});
+          navigator.share(shareData).then(function() {
+            trackShare();
+          }).catch(function() {});
         } else {
           navigator.clipboard.writeText(window.location.href).then(function() {
+            trackShare();
             var lang = window.__i18nLang || 'en';
             var uiMap = window.__i18nUi || {};
             var copiedText = (uiMap.linkCopied && uiMap.linkCopied[lang]) || 'Link copied!';
