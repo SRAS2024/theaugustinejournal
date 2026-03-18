@@ -59,7 +59,7 @@
               <div>
                 <div class="title" style="margin:0;">
                   <a href="/post/<%= p.slug %>" target="_blank" rel="noopener noreferrer"><%= p.title %></a>
-                  <span style="font-size:11px;color:rgba(138,138,153,0.6);font-family:var(--font-sans);font-weight:400;margin-left:8px;"><%= p.viewCount || 0 %> <%= (p.viewCount || 0) === 1 ? 'view' : 'views' %></span>
+                  <span style="font-size:11px;color:rgba(138,138,153,0.6);font-family:var(--font-sans);font-weight:400;margin-left:8px;"><%= p.viewCount || 0 %> <%= (p.viewCount || 0) === 1 ? 'view' : 'views' %> &middot; <%= p.shareCount || 0 %> <%= (p.shareCount || 0) === 1 ? 'share' : 'shares' %></span>
                 </div>
                 <div class="muted" style="margin-top:6px;font-size:12px;">
                   <span data-i18n="<%= p.type === 'BLOG' ? 'blog' : (p.type === 'ESSAY' ? 'essay' : 'letter') %>"><%= p.type === 'BLOG' ? 'Blog' : (p.type === 'ESSAY' ? 'Essay' : 'Letter') %></span> &middot;

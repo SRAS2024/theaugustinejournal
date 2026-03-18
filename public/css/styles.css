@@ -573,6 +573,26 @@ main.container {
   flex-shrink: 0;
 }
 
+.post-stats {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--muted);
+  letter-spacing: 0.3px;
+}
+
+.post-stats svg {
+  flex-shrink: 0;
+  opacity: 0.7;
+}
+
+.post-stats .postFooter-divider {
+  margin: 0 4px;
+}
+
 /* ===== Footer ===== */
 .footer {
   padding: 32px 0 40px;
@@ -944,11 +964,27 @@ textarea:focus-visible {
   .admin-nav {
     gap: 4px;
     font-size: 12px;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    justify-content: flex-start;
+    padding-left: 4px;
+    padding-right: 4px;
+  }
+
+  .admin-nav::-webkit-scrollbar {
+    display: none;
   }
 
   .admin-nav a, .admin-nav button {
     padding: 6px 10px;
     font-size: 12px;
+    flex-shrink: 0;
+  }
+
+  .admin-nav form {
+    flex-shrink: 0;
   }
 
   .stat-card .stat-value {
