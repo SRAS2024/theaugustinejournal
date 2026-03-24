@@ -151,7 +151,7 @@
 
       document.getElementById('subscribeSubmit').addEventListener('click', function() {
         var email = emailInput.value.trim();
-        var emailRegex = /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/;
+        var emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
         if (!emailRegex.test(email)) {
           var lang = window.__i18nLang || 'en';
