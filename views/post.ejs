@@ -58,8 +58,8 @@
             <input type="email" class="form-input" id="subscribeEmail" data-i18n-placeholder="enterEmail" placeholder="Enter your email address" autocomplete="email" />
             <div class="subscribe-error" id="subscribeError"></div>
             <div class="modal-actions">
-              <button class="btn primary" id="subscribeSubmit" type="button" data-i18n="subscribe">Subscribe</button>
               <button class="btn" id="subscribeCancel" type="button" data-i18n="cancel">Cancel</button>
+              <button class="btn primary" id="subscribeSubmit" type="button" data-i18n="subscribe">Subscribe</button>
             </div>
           </div>
           <div class="subscribe-success" id="subscribeSuccess" style="display:none;">
@@ -151,7 +151,7 @@
 
       document.getElementById('subscribeSubmit').addEventListener('click', function() {
         var email = emailInput.value.trim();
-        var emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        var emailRegex = /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/;
 
         if (!emailRegex.test(email)) {
           var lang = window.__i18nLang || 'en';
