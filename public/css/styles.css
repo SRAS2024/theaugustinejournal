@@ -213,7 +213,7 @@ main.container {
   display: flex;
   justify-content: center;
   margin: 20px auto 24px;
-  max-width: 240px;
+  max-width: 300px;
   color: var(--muted);
   user-select: none;
   pointer-events: none;
@@ -574,6 +574,110 @@ main.container {
 }
 
 
+/* ===== Subscribe CTA (Homepage) ===== */
+.subscribe-cta {
+  margin-top: 28px;
+  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.subscribe-cta-label {
+  color: var(--muted);
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 400;
+  letter-spacing: 0.3px;
+}
+
+.subscribe-cta-btn {
+  padding: 8px 18px;
+  font-size: 12px;
+}
+
+/* ===== Subscribe Bell Button (Post Footer) ===== */
+.subscribe-bell-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--muted);
+  letter-spacing: 0.3px;
+  transition: color 0.2s;
+  white-space: nowrap;
+}
+
+.subscribe-bell-btn:hover {
+  color: var(--text);
+}
+
+.subscribe-bell-btn svg {
+  flex-shrink: 0;
+}
+
+/* ===== Subscribe Modal ===== */
+.subscribe-modal-box {
+  max-width: 400px;
+  background: var(--bg2);
+  border: 1px solid var(--card-border);
+}
+
+.subscribe-modal-title {
+  font-family: var(--font-serif);
+  font-size: 22px;
+  font-weight: 500;
+  text-align: center;
+  margin-bottom: 20px;
+  color: var(--text);
+}
+
+.subscribe-modal-body .form-input {
+  margin-bottom: 4px;
+}
+
+.subscribe-error {
+  display: none;
+  color: #e07070;
+  font-family: var(--font-sans);
+  font-size: 12px;
+  margin: 4px 0 0;
+  text-align: left;
+}
+
+.subscribe-success {
+  text-align: center;
+}
+
+.subscribe-success p {
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--text);
+  margin: 0;
+}
+
+/* ===== Stat Card Link (clickable) ===== */
+.stat-card-link {
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s, transform 0.15s;
+}
+
+.stat-card-link:hover {
+  border-color: var(--purple-border);
+  background: var(--purple-soft);
+  text-decoration: none;
+  transform: translateY(-1px);
+}
+
 /* ===== Footer ===== */
 .footer {
   padding: 32px 0 40px;
@@ -922,7 +1026,7 @@ textarea:focus-visible {
   }
 
   .home-illustration {
-    max-width: 180px;
+    max-width: 220px;
     margin: 16px auto 20px;
   }
 
@@ -983,7 +1087,7 @@ textarea:focus-visible {
   }
 
   .home-illustration {
-    max-width: 140px;
+    max-width: 180px;
     margin: 12px auto 16px;
   }
 

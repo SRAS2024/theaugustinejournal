@@ -74,3 +74,29 @@ model PdfFile {
   size      Int
   createdAt DateTime @default(now())
 }
+
+model Subscriber {
+  id        String   @id
+  email     String   @unique
+  language  String   @default("en")
+  createdAt DateTime @default(now())
+
+  @@index([email])
+}
+
+model EmailLog {
+  id        String   @id
+  type      String   // "WEEKLY_THROWBACK" or "NEW_POST"
+  postId    String   @map("post_id")
+  sentAt    DateTime @default(now()) @map("sent_at")
+
+  @@index([type, sentAt])
+  @@map("email_logs")
+}
+
+model ThrowbackTracker {
+  id             Int    @id @default(1)
+  lastSentPostId String @default("") @map("last_sent_post_id")
+
+  @@map("throwback_tracker")
+}
