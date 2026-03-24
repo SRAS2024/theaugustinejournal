@@ -38,4 +38,96 @@ router.post("/posts/:id/share", async (req, res) => {
   }
 });
 
+/* ── Subscribe ── */
+router.post("/subscribe", async (req, res) => {
+  try {
+    const email = String(req.body?.email ?? "").trim().toLowerCase();
+    const language = String(req.body?.language ?? "en").trim();
+
+    // Basic email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return res.json({ success: false, error: "Invalid email" });
+    }
+
+    const prisma = getPrisma();
+
+    // Check for duplicate
+    const existing = await prisma.subscriber.findUnique({ where: { email } });
+    if (existing) {
+      return res.json({ success: false, duplicate: true });
+    }
+
+    await prisma.subscriber.create({
+      data: { id: nanoid(), email, language }
+    });
+
+    return res.json({ success: true });
+  } catch (err) {
+    console.error("[api/subscribe] failed:", err?.message || err);
+    return res.json({ success: false, error: "Something went wrong." });
+  }
+});
+
+/* ── Unsubscribe (GET for email link clicks) ── */
+router.get("/unsubscribe", async (req, res) => {
+  try {
+    const email = String(req.query?.email ?? "").trim().toLowerCase();
+    const lang = String(req.query?.lang ?? "en").trim();
+
+    if (!email) {
+      return res.status(400).send("Missing email.");
+    }
+
+    const prisma = getPrisma();
+    try {
+      await prisma.subscriber.delete({ where: { email } });
+    } catch {
+      // Already unsubscribed or doesn't exist — that's fine
+    }
+
+    // i18n messages for the unsubscribe confirmation page
+    const messages = {
+      en: { title: "Unsubscribed", message: "You have been successfully unsubscribed from The Augustine Journal emails." },
+      pt: { title: "Inscrição Cancelada", message: "Sua inscrição nos emails do The Augustine Journal foi cancelada com sucesso." },
+      es: { title: "Suscripción Cancelada", message: "Se ha cancelado exitosamente su suscripción a los correos de The Augustine Journal." },
+      fr: { title: "Désabonné", message: "Vous avez été désabonné avec succès des emails de The Augustine Journal." },
+      de: { title: "Abgemeldet", message: "Sie wurden erfolgreich von den E-Mails des The Augustine Journal abgemeldet." },
+      it: { title: "Iscrizione Annullata", message: "La tua iscrizione alle email di The Augustine Journal è stata annullata con successo." }
+    };
+
+    const m = messages[lang] || messages.en;
+
+    res.send(`<!DOCTYPE html>
+<html lang="${lang}">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>${m.title} | The Augustine Journal</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&family=Inter:wght@300;400;500&display=swap" rel="stylesheet"/>
+  <style>
+    body { margin:0; background:#0a0a0e; color:#e8e8ed; font-family:'Cormorant Garamond',Georgia,serif; display:flex; align-items:center; justify-content:center; min-height:100vh; padding:20px; }
+    .box { text-align:center; max-width:480px; }
+    h1 { font-size:28px; font-weight:500; margin:0 0 16px; }
+    p { font-size:17px; line-height:1.7; color:rgba(232,232,237,0.85); margin:0 0 24px; }
+    a { display:inline-block; padding:10px 20px; border-radius:8px; border:1px solid rgba(255,255,255,0.07); background:rgba(255,255,255,0.02); color:#e8e8ed; text-decoration:none; font-family:'Inter',sans-serif; font-size:13px; transition:border-color 0.2s; }
+    a:hover { border-color:rgba(91,45,142,0.2); background:rgba(91,45,142,0.07); }
+  </style>
+</head>
+<body>
+  <div class="box">
+    <h1>${m.title}</h1>
+    <p>${m.message}</p>
+    <a href="/">The Augustine Journal</a>
+  </div>
+</body>
+</html>`);
+  } catch (err) {
+    console.error("[api/unsubscribe] failed:", err?.message || err);
+    res.status(500).send("Something went wrong.");
+  }
+});
+
 export default router;

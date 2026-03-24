@@ -12,6 +12,7 @@ import { requireAdmin } from "../middleware/auth.js";
 import { ensureUploadsDir, getUploadsDir } from "../lib/uploads.js";
 import { sanitizeRichHtml } from "../lib/sanitize.js";
 import { isValidAdminUser, verifyAdminPassword } from "../lib/security.js";
+import { sendNewPostEmail } from "../lib/email-service.js";
 
 const router = Router();
 
@@ -236,13 +237,14 @@ router.get("/welcome", requireAdmin, (_req, res) => {
 router.get("/dashboard", requireAdmin, async (req, res, next) => {
   try {
     const prisma = getPrisma();
-    const [settings, notices, postCount, blogCount, essayCount, letterCount] = await Promise.all([
+    const [settings, notices, postCount, blogCount, essayCount, letterCount, subscriberCount] = await Promise.all([
       prisma.siteSettings.findUnique({ where: { id: 1 } }),
       prisma.notice.findMany({ orderBy: { order: "asc" }, take: 3 }),
       prisma.post.count(),
       prisma.post.count({ where: { type: "BLOG" } }),
       prisma.post.count({ where: { type: "ESSAY" } }),
-      prisma.post.count({ where: { type: "LETTER" } })
+      prisma.post.count({ where: { type: "LETTER" } }),
+      prisma.subscriber.count()
     ]);
     res.render("admin/dashboard", {
       settings,
@@ -251,6 +253,7 @@ router.get("/dashboard", requireAdmin, async (req, res, next) => {
       blogCount,
       essayCount,
       letterCount,
+      subscriberCount,
       saved: req.query.saved === "true"
     });
   } catch (err) {
@@ -262,6 +265,7 @@ router.get("/dashboard", requireAdmin, async (req, res, next) => {
         blogCount: 0,
         essayCount: 0,
         letterCount: 0,
+        subscriberCount: 0,
         saved: req.query.saved === "true",
         error: ""
       });
@@ -354,6 +358,23 @@ router.post("/notices/:id/delete", requireAdmin, async (req, res, next) => {
     res.redirect("/admin/settings?saved=true");
   } catch (err) {
     if (isTableMissingError(err)) return res.status(503).send(SCHEMA_NOT_READY);
+    next(err);
+  }
+});
+
+/* ---------- Subscribers ---------- */
+
+router.get("/subscribers", requireAdmin, async (req, res, next) => {
+  try {
+    const prisma = getPrisma();
+    const subscribers = await prisma.subscriber.findMany({
+      orderBy: { createdAt: "desc" }
+    });
+    res.render("admin/subscribers", { subscribers });
+  } catch (err) {
+    if (isTableMissingError(err)) {
+      return res.render("admin/subscribers", { subscribers: [] });
+    }
     next(err);
   }
 });
@@ -483,8 +504,13 @@ router.post("/posts/create", requireAdmin, upload.single("pdfFile"), async (req,
     const collision = await prisma.post.findUnique({ where: { slug } });
     if (collision) slug = `${slug}-${nanoid(6)}`;
 
-    await prisma.post.create({
+    const newPost = await prisma.post.create({
       data: { id: nanoid(), slug, type, title, postDate, contentType, contentHtml, pdfPath, autoTranslateTitle }
+    });
+
+    // Fire-and-forget: send new post notification email
+    sendNewPostEmail(newPost).catch(err => {
+      console.error("[admin] Failed to send new post email:", err?.message || err);
     });
 
     res.redirect("/admin/posts?saved=true");

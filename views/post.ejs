@@ -38,12 +38,35 @@
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
           <span data-i18n="share">Share</span>
         </button>
+        <span class="postFooter-divider"></span>
+        <button class="subscribe-bell-btn" type="button" aria-label="Subscribe">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+          <span data-i18n="subscribe">Subscribe</span>
+        </button>
         ${post.pdfPath
           ? `<span class="postFooter-divider"></span>
              <a class="pdf-link" href="${post.pdfPath}" target="_blank" rel="noopener noreferrer" data-i18n="viewPdf">View Original PDF</a>`
           : ""
         }
       </footer>
+
+      <!-- Subscribe popup modal -->
+      <div class="modal-overlay" id="subscribeModal">
+        <div class="modal-box subscribe-modal-box">
+          <div class="subscribe-modal-title" data-i18n="subscribe">Subscribe</div>
+          <div class="subscribe-modal-body" id="subscribeModalBody">
+            <input type="email" class="form-input" id="subscribeEmail" data-i18n-placeholder="enterEmail" placeholder="Enter your email address" autocomplete="email" />
+            <div class="subscribe-error" id="subscribeError"></div>
+            <div class="modal-actions">
+              <button class="btn primary" id="subscribeSubmit" type="button" data-i18n="subscribe">Subscribe</button>
+              <button class="btn" id="subscribeCancel" type="button" data-i18n="cancel">Cancel</button>
+            </div>
+          </div>
+          <div class="subscribe-success" id="subscribeSuccess" style="display:none;">
+            <p data-i18n="subscribeThankYou">Thank you for subscribing to The Augustine Journal. You may unsubscribe at any time in your email.</p>
+          </div>
+        </div>
+      </div>
     </section>
 
     <script>
@@ -84,6 +107,89 @@
             }, 2000);
           });
         }
+      });
+    })();
+    </script>
+
+    <script>
+    (function() {
+      var modal = document.getElementById('subscribeModal');
+      if (!modal) return;
+      var emailInput = document.getElementById('subscribeEmail');
+      var errorEl = document.getElementById('subscribeError');
+      var successEl = document.getElementById('subscribeSuccess');
+      var bodyEl = document.getElementById('subscribeModalBody');
+      var csrfMeta = document.querySelector('meta[name="csrf-token"]');
+      var csrfToken = csrfMeta ? csrfMeta.getAttribute('content') : '';
+
+      function openModal() {
+        modal.classList.add('active');
+        emailInput.value = '';
+        errorEl.textContent = '';
+        errorEl.style.display = 'none';
+        successEl.style.display = 'none';
+        bodyEl.style.display = '';
+        setTimeout(function() { emailInput.focus(); }, 100);
+      }
+
+      function closeModal() {
+        modal.classList.remove('active');
+      }
+
+      document.addEventListener('click', function(e) {
+        if (e.target.closest('.subscribe-bell-btn')) {
+          e.preventDefault();
+          openModal();
+        }
+      });
+
+      document.getElementById('subscribeCancel').addEventListener('click', closeModal);
+
+      modal.addEventListener('click', function(e) {
+        if (e.target === modal) closeModal();
+      });
+
+      document.getElementById('subscribeSubmit').addEventListener('click', function() {
+        var email = emailInput.value.trim();
+        var emailRegex = /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/;
+
+        if (!emailRegex.test(email)) {
+          var lang = window.__i18nLang || 'en';
+          var uiMap = window.__i18nUi || {};
+          errorEl.textContent = (uiMap.invalidEmail && uiMap.invalidEmail[lang]) || 'Invalid email';
+          errorEl.style.display = 'block';
+          return;
+        }
+
+        var lang = window.__i18nLang || 'en';
+        fetch('/api/subscribe', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-csrf-token': csrfToken },
+          body: JSON.stringify({ email: email, language: lang })
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          if (data.success) {
+            bodyEl.style.display = 'none';
+            successEl.style.display = '';
+          } else if (data.duplicate) {
+            var uiMap = window.__i18nUi || {};
+            var lang = window.__i18nLang || 'en';
+            errorEl.textContent = (uiMap.alreadySubscribed && uiMap.alreadySubscribed[lang]) || 'Oops! You are already subscribed';
+            errorEl.style.display = 'block';
+          } else {
+            errorEl.textContent = data.error || 'Something went wrong.';
+            errorEl.style.display = 'block';
+          }
+        })
+        .catch(function() {
+          errorEl.textContent = 'Something went wrong.';
+          errorEl.style.display = 'block';
+        });
+      });
+
+      emailInput.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') document.getElementById('subscribeSubmit').click();
       });
     })();
     </script>

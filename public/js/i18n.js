@@ -140,7 +140,71 @@
       de: "Maximum von 3 Hinweisen erreicht.",
       it: "Massimo di 3 avvisi raggiunto."
     },
-    deleteNoticeConfirm: { en: "Delete this notice?", pt: "Excluir este aviso?", es: "\u00bfEliminar este aviso?", fr: "Supprimer cet avis\u00a0?", de: "Diesen Hinweis l\u00f6schen?", it: "Eliminare questo avviso?" }
+    deleteNoticeConfirm: { en: "Delete this notice?", pt: "Excluir este aviso?", es: "\u00bfEliminar este aviso?", fr: "Supprimer cet avis\u00a0?", de: "Diesen Hinweis l\u00f6schen?", it: "Eliminare questo avviso?" },
+
+    /* ── Subscribe ── */
+    subscribe: {
+      en: "Subscribe", pt: "Inscrever-se", es: "Suscribirse",
+      fr: "S'abonner", de: "Abonnieren", it: "Iscriviti"
+    },
+    stayUpdated: {
+      en: "Stay updated on our latest posts?",
+      pt: "Fique atualizado sobre nossas \u00faltimas publica\u00e7\u00f5es?",
+      es: "\u00bfMant\u00e9nte al d\u00eda con nuestras \u00faltimas publicaciones?",
+      fr: "Restez inform\u00e9 de nos derni\u00e8res publications\u00a0?",
+      de: "Bleiben Sie \u00fcber unsere neuesten Beitr\u00e4ge auf dem Laufenden?",
+      it: "Resta aggiornato sui nostri ultimi articoli?"
+    },
+    enterEmail: {
+      en: "Enter your email address",
+      pt: "Digite seu endere\u00e7o de email",
+      es: "Ingresa tu correo electr\u00f3nico",
+      fr: "Entrez votre adresse e-mail",
+      de: "Geben Sie Ihre E-Mail-Adresse ein",
+      it: "Inserisci il tuo indirizzo email"
+    },
+    invalidEmail: {
+      en: "Invalid email",
+      pt: "Email inv\u00e1lido",
+      es: "Correo electr\u00f3nico no v\u00e1lido",
+      fr: "E-mail invalide",
+      de: "Ung\u00fcltige E-Mail",
+      it: "Email non valida"
+    },
+    alreadySubscribed: {
+      en: "Oops! You are already subscribed",
+      pt: "Ops! Voc\u00ea j\u00e1 est\u00e1 inscrito",
+      es: "\u00a1Ups! Ya est\u00e1s suscrito",
+      fr: "Oups\u00a0! Vous \u00eates d\u00e9j\u00e0 abonn\u00e9",
+      de: "Hoppla! Sie sind bereits abonniert",
+      it: "Ops! Sei gi\u00e0 iscritto"
+    },
+    subscribeThankYou: {
+      en: "Thank you for subscribing to The Augustine Journal. You may unsubscribe at any time in your email.",
+      pt: "Obrigado por se inscrever no The Augustine Journal. Voc\u00ea pode cancelar sua inscri\u00e7\u00e3o a qualquer momento em seu email.",
+      es: "Gracias por suscribirte a The Augustine Journal. Puedes cancelar tu suscripci\u00f3n en cualquier momento desde tu correo.",
+      fr: "Merci de vous \u00eatre abonn\u00e9 \u00e0 The Augustine Journal. Vous pouvez vous d\u00e9sabonner \u00e0 tout moment dans votre e-mail.",
+      de: "Vielen Dank f\u00fcr Ihr Abonnement des The Augustine Journal. Sie k\u00f6nnen sich jederzeit in Ihrer E-Mail abmelden.",
+      it: "Grazie per esserti iscritto a The Augustine Journal. Puoi annullare l'iscrizione in qualsiasi momento dalla tua email."
+    },
+
+    /* ── Admin: subscribers ── */
+    subscribers: {
+      en: "Subscribers", pt: "Inscritos", es: "Suscriptores",
+      fr: "Abonn\u00e9s", de: "Abonnenten", it: "Iscritti"
+    },
+    subscriberCount: {
+      en: "subscriber(s)", pt: "inscrito(s)", es: "suscriptor(es)",
+      fr: "abonn\u00e9(s)", de: "Abonnent(en)", it: "iscritto/i"
+    },
+    noSubscribers: {
+      en: "No subscribers yet.",
+      pt: "Nenhum inscrito ainda.",
+      es: "No hay suscriptores todav\u00eda.",
+      fr: "Aucun abonn\u00e9 pour le moment.",
+      de: "Noch keine Abonnenten.",
+      it: "Nessun iscritto ancora."
+    }
   };
 
   /* ===== Language detection ===== */

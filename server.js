@@ -301,6 +301,15 @@ async function startBackground() {
     res.status(500).send("Something went wrong.");
   });
 
+  /* ---------- Email scheduler ---------- */
+
+  try {
+    const { startScheduler } = await import("./src/lib/scheduler.js");
+    startScheduler();
+  } catch (err) {
+    console.error("[startup] Failed to start email scheduler:", err?.message || err);
+  }
+
   /* ---------- Ready ---------- */
 
   appReady = true;
