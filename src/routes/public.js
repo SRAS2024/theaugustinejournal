@@ -194,4 +194,12 @@ router.get("/robots.txt", (_req, res) => {
   res.send(lines.join("\n"));
 });
 
+/* ------------------------------------------------------------------ */
+/*  BIMI brand logo (sender icon for email clients)                   */
+/* ------------------------------------------------------------------ */
+
+router.get("/.well-known/bimi", (_req, res) => {
+  res.redirect(301, "/public/icons/favicon.svg");
+});
+
 export default router;

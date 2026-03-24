@@ -57,56 +57,80 @@ function t(key, lang) {
 }
 
 /* ── Build styled HTML email ── */
+/*
+ * Email background strategy: Many email clients (Gmail, Outlook, Yahoo) strip
+ * CSS "background" from <body> and ignore rgba() values. We use:
+ *   - bgcolor="#0a0a0e" HTML attribute on every table, tr, and td
+ *   - background-color:#0a0a0e inline style as reinforcement
+ *   - Solid hex colors instead of rgba() for all foreground/border colors
+ *
+ * Color mapping (site palette → email-safe hex):
+ *   --bg        #0a0a0e  →  #0a0a0e
+ *   --text      #e8e8ed  →  #e8e8ed
+ *   --muted     #8a8a99  →  #8a8a99
+ *   border rgba(255,255,255,0.07) on #0a0a0e  →  #1c1c20
+ *   btn bg rgba(255,255,255,0.02) on #0a0a0e  →  #0f0f13
+ *   text  rgba(232,232,237,0.88)              →  #ccccD1
+ *   purple decorative                         →  #2b1c3e
+ */
 function buildEmailHtml({ subject, message, postTitle, postUrl, unsubscribeUrl, lang }) {
   return `<!DOCTYPE html>
-<html lang="${lang || "en"}">
+<html lang="${lang || "en"}" xmlns="http://www.w3.org/1999/xhtml">
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="color-scheme" content="dark"/>
+  <meta name="supported-color-schemes" content="dark"/>
   <title>${subject}</title>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&family=Inter:wght@300;400;500&display=swap');
+    :root { color-scheme: dark; supported-color-schemes: dark; }
+    body, table, td { background-color: #0a0a0e !important; }
   </style>
+  <!--[if mso]>
+  <style>body,table,td{background:#0a0a0e !important;}</style>
+  <![endif]-->
 </head>
-<body style="margin:0;padding:0;background:#0a0a0e;color:#e8e8ed;font-family:'Cormorant Garamond',Georgia,'Times New Roman',serif;">
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#0a0a0e;">
-    <tr><td align="center" style="padding:40px 20px;">
-      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;">
+<body bgcolor="#0a0a0e" style="margin:0;padding:0;background-color:#0a0a0e;color:#e8e8ed;font-family:'Cormorant Garamond',Georgia,'Times New Roman',serif;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" bgcolor="#0a0a0e" style="background-color:#0a0a0e;margin:0;padding:0;">
+    <tr bgcolor="#0a0a0e">
+      <td align="center" bgcolor="#0a0a0e" style="background-color:#0a0a0e;padding:40px 20px;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" bgcolor="#0a0a0e" style="background-color:#0a0a0e;max-width:560px;">
 
         <!-- Title: The Augustine Journal -->
-        <tr><td align="center" style="padding:0 0 24px;">
+        <tr bgcolor="#0a0a0e"><td align="center" bgcolor="#0a0a0e" style="background-color:#0a0a0e;padding:0 0 24px;">
           <h1 style="margin:0;font-family:'Cormorant Garamond',Georgia,serif;font-size:28px;font-weight:500;letter-spacing:0.5px;color:#e8e8ed;">The Augustine Journal</h1>
         </td></tr>
 
         <!-- Cathedral artwork (ringing bell) -->
-        <tr><td align="center" style="padding:0 0 28px;">
+        <tr bgcolor="#0a0a0e"><td align="center" bgcolor="#0a0a0e" style="background-color:#0a0a0e;padding:0 0 28px;">
           ${cathedralRingingSvg}
         </td></tr>
 
         <!-- Decorative rule -->
-        <tr><td align="center" style="padding:0 0 24px;">
-          <div style="width:200px;height:1px;background:linear-gradient(to right,transparent,rgba(168,139,212,0.18) 20%,rgba(168,139,212,0.18) 80%,transparent);"></div>
+        <tr bgcolor="#0a0a0e"><td align="center" bgcolor="#0a0a0e" style="background-color:#0a0a0e;padding:0 0 24px;">
+          <table role="presentation" cellpadding="0" cellspacing="0" width="200" style="margin:0 auto;"><tr><td style="height:1px;background-color:#2b1c3e;font-size:1px;line-height:1px;">&nbsp;</td></tr></table>
         </td></tr>
 
         <!-- Message -->
-        <tr><td align="center" style="padding:0 0 24px;">
-          <p style="margin:0;font-family:'Cormorant Garamond',Georgia,serif;font-size:18px;line-height:1.7;color:rgba(232,232,237,0.88);">${message}</p>
+        <tr bgcolor="#0a0a0e"><td align="center" bgcolor="#0a0a0e" style="background-color:#0a0a0e;padding:0 0 24px;">
+          <p style="margin:0;font-family:'Cormorant Garamond',Georgia,serif;font-size:18px;line-height:1.7;color:#ccccd1;">${message}</p>
         </td></tr>
 
         <!-- Post link (styled rectangular treatment) -->
-        <tr><td align="center" style="padding:0 0 36px;">
-          <a href="${postUrl}" style="display:inline-block;padding:14px 24px;border-radius:8px;border:1px solid rgba(255,255,255,0.07);background:rgba(255,255,255,0.02);font-family:'Cormorant Garamond',Georgia,serif;font-size:18px;font-weight:500;color:#e8e8ed;text-decoration:none;">${postTitle}</a>
+        <tr bgcolor="#0a0a0e"><td align="center" bgcolor="#0a0a0e" style="background-color:#0a0a0e;padding:0 0 36px;">
+          <a href="${postUrl}" style="display:inline-block;padding:14px 24px;border-radius:8px;border:1px solid #1c1c20;background-color:#0f0f13;font-family:'Cormorant Garamond',Georgia,serif;font-size:18px;font-weight:500;color:#e8e8ed;text-decoration:none;">${postTitle}</a>
         </td></tr>
 
         <!-- Decorative rule -->
-        <tr><td align="center" style="padding:0 0 20px;">
-          <div style="width:100%;height:1px;background:rgba(255,255,255,0.07);"></div>
+        <tr bgcolor="#0a0a0e"><td align="center" bgcolor="#0a0a0e" style="background-color:#0a0a0e;padding:0 0 20px;">
+          <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="margin:0;"><tr><td style="height:1px;background-color:#1c1c20;font-size:1px;line-height:1px;">&nbsp;</td></tr></table>
         </td></tr>
 
         <!-- Unsubscribe -->
-        <tr><td align="center" style="padding:0;">
-          <p style="margin:0;font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;font-size:11px;color:rgba(138,138,153,0.6);letter-spacing:0.3px;">
-            ${t("dontWantEmails", lang)} <a href="${unsubscribeUrl}" style="color:rgba(138,138,153,0.6);text-decoration:underline;">${t("unsubscribeLinkText", lang)}</a>
+        <tr bgcolor="#0a0a0e"><td align="center" bgcolor="#0a0a0e" style="background-color:#0a0a0e;padding:0;">
+          <p style="margin:0;font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;font-size:11px;color:#5c5c67;letter-spacing:0.3px;">
+            ${t("dontWantEmails", lang)} <a href="${unsubscribeUrl}" style="color:#5c5c67;text-decoration:underline;">${t("unsubscribeLinkText", lang)}</a>
           </p>
         </td></tr>
 
