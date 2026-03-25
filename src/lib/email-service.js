@@ -1,7 +1,6 @@
 // src/lib/email-service.js
 // Email service using the Resend API via node-fetch
 import { getPrisma } from "./db.js";
-import { cathedralRingingSvg } from "./cathedral-svg.js";
 
 const SENDER = "The Augustine Journal <notifications@theaugustinejournal.com>";
 const REPLY_TO = "The Augustine Journal <notifications@theaugustinejournal.com>";
@@ -128,6 +127,7 @@ function t(key, lang) {
  */
 function buildEmailHtml({ subject, message, postTitle, postUrl, unsubscribeUrl, lang }) {
   const preheader = `${message} — ${postTitle}`;
+  const cathedralImgUrl = `${SITE_URL()}/public/icons/cathedral-email.svg`;
   return `<!DOCTYPE html>
 <html lang="${lang || "en"}" xmlns="http://www.w3.org/1999/xhtml">
 <head>
@@ -136,8 +136,10 @@ function buildEmailHtml({ subject, message, postTitle, postUrl, unsubscribeUrl, 
   <meta name="color-scheme" content="dark"/>
   <meta name="supported-color-schemes" content="dark"/>
   <title>${subject}</title>
+  <!--[if !mso]><!-->
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&family=Inter:wght@300;400;500&display=swap"/>
+  <!--<![endif]-->
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&family=Inter:wght@300;400;500&display=swap');
     :root { color-scheme: dark; supported-color-schemes: dark; }
     body, table, td { background-color: #0a0a0e !important; }
   </style>
@@ -158,9 +160,9 @@ function buildEmailHtml({ subject, message, postTitle, postUrl, unsubscribeUrl, 
           <h1 style="margin:0;font-family:'Cormorant Garamond',Georgia,serif;font-size:28px;font-weight:500;letter-spacing:0.5px;color:#e8e8ed;">${t("siteTitle", lang)}</h1>
         </td></tr>
 
-        <!-- Cathedral artwork (ringing bell) -->
+        <!-- Cathedral artwork (hosted image — Gmail strips inline SVG) -->
         <tr bgcolor="#0a0a0e"><td align="center" bgcolor="#0a0a0e" style="background-color:#0a0a0e;padding:0 0 28px;">
-          ${cathedralRingingSvg}
+          <img src="${cathedralImgUrl}" alt="Cathedral" width="260" height="140" style="display:block;margin:0 auto;width:260px;max-width:100%;height:auto;border:0;" />
         </td></tr>
 
         <!-- Decorative rule -->
@@ -200,6 +202,7 @@ function buildEmailHtml({ subject, message, postTitle, postUrl, unsubscribeUrl, 
 /* ── Build simple HTML email (no post link) ── */
 function buildSimpleEmailHtml({ subject, message, unsubscribeUrl, lang }) {
   const preheader = `${message} — ${t("siteTitle", lang)}`;
+  const cathedralImgUrl = `${SITE_URL()}/public/icons/cathedral-email.svg`;
   const unsubscribeSection = unsubscribeUrl ? `
         <!-- Decorative rule -->
         <tr bgcolor="#0a0a0e"><td align="center" bgcolor="#0a0a0e" style="background-color:#0a0a0e;padding:0 0 20px;">
@@ -221,8 +224,10 @@ function buildSimpleEmailHtml({ subject, message, unsubscribeUrl, lang }) {
   <meta name="color-scheme" content="dark"/>
   <meta name="supported-color-schemes" content="dark"/>
   <title>${subject}</title>
+  <!--[if !mso]><!-->
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&family=Inter:wght@300;400;500&display=swap"/>
+  <!--<![endif]-->
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&family=Inter:wght@300;400;500&display=swap');
     :root { color-scheme: dark; supported-color-schemes: dark; }
     body, table, td { background-color: #0a0a0e !important; }
   </style>
@@ -243,9 +248,9 @@ function buildSimpleEmailHtml({ subject, message, unsubscribeUrl, lang }) {
           <h1 style="margin:0;font-family:'Cormorant Garamond',Georgia,serif;font-size:28px;font-weight:500;letter-spacing:0.5px;color:#e8e8ed;">${t("siteTitle", lang)}</h1>
         </td></tr>
 
-        <!-- Cathedral artwork (ringing bell) -->
+        <!-- Cathedral artwork (hosted image — Gmail strips inline SVG) -->
         <tr bgcolor="#0a0a0e"><td align="center" bgcolor="#0a0a0e" style="background-color:#0a0a0e;padding:0 0 28px;">
-          ${cathedralRingingSvg}
+          <img src="${cathedralImgUrl}" alt="Cathedral" width="260" height="140" style="display:block;margin:0 auto;width:260px;max-width:100%;height:auto;border:0;" />
         </td></tr>
 
         <!-- Decorative rule -->
