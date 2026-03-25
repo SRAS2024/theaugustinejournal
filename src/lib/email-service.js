@@ -445,11 +445,12 @@ export async function sendWeeklyThrowbackEmail() {
     if (i < subscribers.length - 1) await sleep(250);
   }
 
-  // Update tracker
+  // Update tracker (persist both the post rotation and the send date)
+  const sentDate = new Date().toISOString().slice(0, 10);
   await prisma.throwbackTracker.upsert({
     where: { id: 1 },
-    update: { lastSentPostId: post.id },
-    create: { id: 1, lastSentPostId: post.id }
+    update: { lastSentPostId: post.id, lastSentDate: sentDate },
+    create: { id: 1, lastSentPostId: post.id, lastSentDate: sentDate }
   });
 
   // Log the email
