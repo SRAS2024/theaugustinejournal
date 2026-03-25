@@ -102,6 +102,11 @@ app.use(express.json({ limit: "1mb" }));
 app.use(express.urlencoded({ extended: true, limit: "2mb" }));
 app.use(cookieParser());
 
+// Serve /favicon.ico from the icons directory (browsers request this by default)
+app.get("/favicon.ico", (_req, res) => {
+  res.sendFile(path.join(__dirname, "public", "icons", "favicon.ico"));
+});
+
 app.use("/public", express.static(path.join(__dirname, "public")));
 // Serve PDFs: try filesystem first (for freshly uploaded files), then fall
 // back to the database so that PDFs survive ephemeral-filesystem redeployments.

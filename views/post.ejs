@@ -202,4 +202,15 @@
   `;
 %>
 
-<%- include("layout", { title: `${post.title} | The Augustine Journal`, active: post.type === "BLOG" ? "blog" : post.type === "ESSAY" ? "essays" : "letters", body }) %>
+<%- include("layout", {
+  title: `${post.title} | The Augustine Journal`,
+  active: post.type === "BLOG" ? "blog" : post.type === "ESSAY" ? "essays" : "letters",
+  body,
+  ogTitle: post.title,
+  ogDescription: (post.contentHtml || '').replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim().slice(0, 200) || 'The Augustine Journal, thoughtful reflection and discourse.',
+  ogUrl: typeof siteUrl !== 'undefined' ? `${siteUrl}/post/${post.slug}` : `https://theaugustinejournal.com/post/${post.slug}`,
+  ogType: 'article',
+  ogImage: typeof siteUrl !== 'undefined' ? `${siteUrl}/public/icons/icon-512.png` : 'https://theaugustinejournal.com/public/icons/icon-512.png',
+  ogImageWidth: '512',
+  ogImageHeight: '512'
+}) %>
