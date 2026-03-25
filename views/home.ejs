@@ -258,6 +258,12 @@
           if (data.success) {
             bodyEl.style.display = 'none';
             successEl.style.display = '';
+            var titleEl = document.querySelector('.subscribe-modal-title');
+            if (titleEl) {
+              var uiMap = window.__i18nUi || {};
+              var lang = window.__i18nLang || 'en';
+              titleEl.textContent = (uiMap.subscribed && uiMap.subscribed[lang]) || 'Subscribed!';
+            }
           } else if (data.duplicate) {
             var uiMap = window.__i18nUi || {};
             var lang = window.__i18nLang || 'en';

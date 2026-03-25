@@ -379,6 +379,26 @@ router.get("/subscribers", requireAdmin, async (req, res, next) => {
   }
 });
 
+/* ---------- Subscriber delete (admin unsubscribe) ---------- */
+
+router.post("/subscribers/:id/delete", requireAdmin, async (req, res, next) => {
+  try {
+    const { password } = req.body;
+    if (!password || !(await verifyAdminPassword(password))) {
+      return res.status(401).json({ success: false, error: "Incorrect password." });
+    }
+
+    const prisma = getPrisma();
+    const subscriber = await prisma.subscriber.findUnique({ where: { id: req.params.id } });
+    if (!subscriber) return res.status(404).json({ success: false, error: "Subscriber not found." });
+    await prisma.subscriber.delete({ where: { id: req.params.id } });
+    res.json({ success: true });
+  } catch (err) {
+    if (isTableMissingError(err)) return res.status(503).send(SCHEMA_NOT_READY);
+    next(err);
+  }
+});
+
 /* ---------- Posts list ---------- */
 
 router.get("/posts", requireAdmin, async (req, res, next) => {

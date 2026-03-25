@@ -105,7 +105,7 @@
           <div class="alert-error"><%= error %></div>
         <% } %>
 
-        <form id="postForm" method="POST" enctype="multipart/form-data"
+        <form id="postForm" method="POST" enctype="multipart/form-data" class="notranslate"
           action="<%= mode === "create" ? "/admin/posts/create?_csrf=" + encodeURIComponent(csrfToken) : "/admin/posts/" + post.id + "/update?_csrf=" + encodeURIComponent(csrfToken) %>">
           <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
           <input type="hidden" id="pdfPathInput" name="pdfPath" value="<%= post && post.pdfPath ? post.pdfPath : "" %>" />
