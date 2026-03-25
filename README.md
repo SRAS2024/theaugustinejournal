@@ -4,7 +4,7 @@
 
 ---
 
-A clean, professional journal and blog platform built with Node.js, Express, and PostgreSQL. Deployed on Railway.
+A clean, professional journal and blog platform with built-in newsletter functionality, built with Node.js, Express, and PostgreSQL. Deployed on Railway.
 
 ---
 
@@ -16,19 +16,21 @@ A clean, professional journal and blog platform built with Node.js, Express, and
 - **Individual post pages** with view tracking, share button, and optional original PDF link
 - **Responsive design** with mobile hamburger menu navigation
 - **Auto-translation** into 6 languages (English, Portuguese, Spanish, French, German, Italian) via built-in i18n dictionaries and Google Translate integration
-- **SEO** with auto-generated sitemap.xml and robots.txt
+- **SEO** with auto-generated sitemap.xml, robots.txt, Open Graph meta tags, and Twitter Cards
 - **Share button** using the Web Share API with clipboard fallback
+- **BIMI support** at `/.well-known/bimi` for branded sender icons in email clients
 - Color palette: black, white, grey, and dark purple accents
 
 ### Admin Panel (`/admin`)
 - Secure login with username and password (bcrypt-hashed)
 - Animated welcome screen with loading indicator (charcoal circle, dark purple progress)
-- Dashboard with post counts (total, blogs, essays, letters) and notice preview
+- Dashboard with post counts (total, blogs, essays, letters), subscriber count, and notice preview
 - **Create posts** via rich text editor (Quill) or PDF upload with automatic text extraction
 - **Edit and delete** any post
 - **Per-post auto-translate toggle** to control whether Google Translate applies to the title
 - **Notices system** (up to 3) displayed on the home page between the title and about section
 - **Site settings** to edit home page about text via rich text editor
+- **Subscriber management** — view all subscribers with email and language, delete (unsubscribe) with password confirmation
 - **Post type filter** on the posts management page
 - Save confirmation after all admin actions
 - Session-based authentication (8-hour sessions, HttpOnly, SameSite=lax cookies)
@@ -44,15 +46,31 @@ A clean, professional journal and blog platform built with Node.js, Express, and
 - Posts require: type, title, date, and content (validated on create/save)
 - Automatic URL slug generation from post title
 - Unique view tracking per post (SHA-256 hashed visitor fingerprint)
+- Share count tracking per post
+
+### Newsletter & Email System
+- **Email delivery** via [Resend](https://resend.com) API
+- **Subscribe** — visitors can subscribe from the site; confirmation email sent immediately
+- **Unsubscribe** — one-click unsubscribe link in every email, plus admin-initiated removal
+- **New post notifications** — all subscribers are emailed when a new post is created
+- **Weekly throwback** — automatic Thursday email featuring an older post on rotation
+- **Internationalized emails** — all email copy translated to the subscriber's preferred language (en, pt, es, fr, de, it)
+- Dark-themed HTML email templates with cathedral SVG artwork, Cormorant Garamond + Inter fonts
+- List-Unsubscribe headers for one-click unsubscribe in email clients
+- Rate-limited sending with retry logic and exponential backoff
+- Email audit trail logged in the database
 
 ### Storage
-Five data models stored in PostgreSQL:
+Eight data models stored in PostgreSQL:
 
 1. **Post** — blog, essay, and letter content
 2. **SiteSettings** — about text (singleton)
 3. **Notice** — home page notices (up to 3)
 4. **PostView** — unique view records per post
 5. **PdfFile** — PDF binary backup (survives ephemeral filesystem redeployments)
+6. **Subscriber** — email subscribers with language preference
+7. **EmailLog** — audit trail of sent emails (type, post, timestamp)
+8. **ThrowbackTracker** — rotation state for weekly throwback emails
 
 ---
 
@@ -66,6 +84,7 @@ Five data models stored in PostgreSQL:
 | Templating | EJS |
 | Rich Editor | Quill 1.3.7 |
 | Session Store | connect-pg-simple |
+| Email | Resend API (via node-fetch) |
 | PDF Parsing | pdf-parse |
 | File Uploads | multer (15 MB max, PDF only) |
 | Security | Helmet, CSRF (csurf), bcryptjs, rate limiting (180 req/60s) |
@@ -82,13 +101,16 @@ theaugustinejournal/
   server.js                  # Express app entry point (port 8080)
   package.json               # Dependencies and scripts
   prisma/
-    schema.prisma            # Database schema (Post, Notice, SiteSettings, PostView, PdfFile)
+    schema.prisma            # Database schema (8 models)
     seed.js                  # Idempotent default data seeding
     migrations/              # Prisma migration history
   src/
     lib/
       db.js                  # Prisma client singleton
       db-bootstrap.js        # Database migration runner and startup seeding
+      email-service.js       # Resend API email delivery, templates, and i18n
+      scheduler.js           # Hourly scheduler for weekly throwback emails
+      cathedral-svg.js       # Cathedral SVG artwork for email templates
       sanitize.js            # HTML sanitization for rich text
       security.js            # Admin password verification (bcryptjs)
       translate.js           # Translation API handler
@@ -97,16 +119,16 @@ theaugustinejournal/
       auth.js                # Admin session guard (requireAdmin)
       attachLocals.js        # Template locals (CSRF, session, language detection)
     routes/
-      public.js              # Public pages (home, blog, essays, letters, post, sitemap, robots)
-      admin.js               # Admin dashboard, CRUD, PDF extraction, notice management
-      api.js                 # Translation API endpoint
+      public.js              # Public pages (home, blog, essays, letters, post, sitemap, robots, BIMI)
+      admin.js               # Admin dashboard, CRUD, PDF extraction, notice and subscriber management
+      api.js                 # Subscribe, unsubscribe, share count, and translation endpoints
   public/
     css/styles.css           # Complete stylesheet
     js/
       i18n.js                # Auto-translation (UI string dictionaries + Google Translate)
       admin.js               # Admin form toggle and PDF upload AJAX logic
       quill-init.js          # Rich text editor initialization (dual editor mode)
-    icons/                   # Favicon files
+    icons/                   # Favicon and BIMI icon files
     site.webmanifest         # Web app manifest
   views/
     layout.ejs               # Base HTML layout with Google Translate script
@@ -116,13 +138,14 @@ theaugustinejournal/
     partials/
       header.ejs             # Navigation header with hamburger menu
       footer.ejs             # Footer
-  admin/
-    login.ejs                # Admin login
-    welcome.ejs              # Welcome animation screen
-    dashboard.ejs            # Admin dashboard with counts
-    posts.ejs                # Post management list with type filter
-    post-form.ejs            # Create/edit post form (dual content mode)
-    edit-settings.ejs        # Site settings and notice management
+    admin/
+      login.ejs              # Admin login
+      welcome.ejs            # Welcome animation screen
+      dashboard.ejs          # Admin dashboard with counts
+      posts.ejs              # Post management list with type filter
+      post-form.ejs          # Create/edit post form (dual content mode)
+      edit-settings.ejs      # Site settings and notice management
+      subscribers.ejs        # Subscriber management
   uploads/                   # PDF file storage (filesystem cache)
 ```
 
@@ -136,13 +159,12 @@ theaugustinejournal/
 |----------|----------|-------------|
 | `DATABASE_URL` | Yes | PostgreSQL connection string (auto-set by Railway) |
 | `ADMIN_USERNAME` | Yes | Admin login username |
-| `ADMIN_PASSWORD` | Yes | Admin login password (bcrypt-hashed, >= 10 rounds) |
+| `ADMIN_PASSWORD` | Yes | Admin login password |
 | `PORT` | No | Server port (default: 8080) |
 | `SESSION_SECRET` | No | Session encryption key (auto-generated if not set) |
 | `NODE_ENV` | No | Set to `production` for secure cookies and HTTPS enforcement |
-| `SITE_URL` | No | Canonical URL for sitemap (default: https://theaugustinejournal.com) |
-| `TRANSLATE_API_URL` | No | LibreTranslate endpoint (future, currently unused) |
-| `TRANSLATE_API_KEY` | No | API key for translation service (future, currently unused) |
+| `SITE_URL` | No | Canonical URL for sitemap and email links (default: https://theaugustinejournal.com) |
+| `RESEND_API_KEY` | No | [Resend](https://resend.com) API key for email delivery |
 
 ### Build & Start
 
@@ -153,13 +175,22 @@ npm install         # Install dependencies (postinstall runs prisma generate)
 npm start           # node server.js (runs migrations, seeding, and starts Express)
 ```
 
-The server starts listening immediately and runs database bootstrap in the background (migrations, seeding). Returns 503 until ready.
+The server starts listening immediately and runs database bootstrap in the background (migrations, seeding). Returns 503 on `/health` until ready.
 
 ### Host Enforcement
 
 In production, the server automatically:
 - Redirects `www.theaugustinejournal.com` to `theaugustinejournal.com`
 - Redirects HTTP to HTTPS on the canonical domain
+
+### DNS Records
+
+**Required for email branding (BIMI):**
+```
+default._bimi.theaugustinejournal.com  TXT  "v=BIMI1; l=https://theaugustinejournal.com/.well-known/bimi"
+```
+
+BIMI requires a DMARC policy of `p=quarantine` or `p=reject` and passing SPF/DKIM. Gmail additionally requires a VMC (Verified Mark Certificate).
 
 ---
 
