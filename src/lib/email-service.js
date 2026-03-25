@@ -58,24 +58,24 @@ const EMAIL_STRINGS = {
     fr: "Abonné", de: "Abonniert", it: "Iscritto"
   },
   subscribedMessage: {
-    en: "Thank you for subscribing to The Augustine Journal",
-    pt: "Obrigado por se inscrever no O Diário Agostiniano",
-    es: "Gracias por suscribirte a El Diario Agustiniano",
-    fr: "Merci de vous être abonné au Le Journal Augustinien",
-    de: "Vielen Dank für Ihr Abonnement des Das Augustinische Journal",
-    it: "Grazie per esserti iscritto a Il Giornale Agostiniano"
+    en: "Thank you for subscribing to The Augustine Journal!",
+    pt: "Obrigado por se inscrever no O Diário Agostiniano!",
+    es: "Gracias por suscribirte a El Diario Agustiniano!",
+    fr: "Merci de vous être abonné au Le Journal Augustinien!",
+    de: "Vielen Dank für Ihr Abonnement des Das Augustinische Journal!",
+    it: "Grazie per esserti iscritto a Il Giornale Agostiniano!"
   },
   unsubscribedSubject: {
     en: "Unsubscribed", pt: "Inscrição Cancelada", es: "Suscripción Cancelada",
     fr: "Désabonné", de: "Abgemeldet", it: "Iscrizione Annullata"
   },
   unsubscribedMessage: {
-    en: "We are sorry to see you go and would like to thank you for the time you've invested in us",
-    pt: "Lamentamos vê-lo partir e gostaríamos de agradecer pelo tempo que investiu em nós",
-    es: "Lamentamos verte partir y nos gustaría agradecerte por el tiempo que has invertido en nosotros",
-    fr: "Nous sommes désolés de vous voir partir et nous tenons à vous remercier pour le temps que vous nous avez consacré",
-    de: "Es tut uns leid, Sie gehen zu sehen, und wir möchten Ihnen für die Zeit danken, die Sie in uns investiert haben",
-    it: "Ci dispiace vederti andare e vorremmo ringraziarti per il tempo che hai investito in noi"
+    en: "We are sorry to see you go and would like to thank you for the time you've invested in us!",
+    pt: "Lamentamos vê-lo partir e gostaríamos de agradecer pelo tempo que investiu em nós!",
+    es: "Lamentamos verte partir y nos gustaría agradecerte por el tiempo que has invertido en nosotros!",
+    fr: "Nous sommes désolés de vous voir partir et nous tenons à vous remercier pour le temps que vous nous avez consacré!",
+    de: "Es tut uns leid, Sie gehen zu sehen, und wir möchten Ihnen für die Zeit danken, die Sie in uns investiert haben!",
+    it: "Ci dispiace vederti andare e vorremmo ringraziarti per il tempo che hai investito in noi!"
   }
 };
 

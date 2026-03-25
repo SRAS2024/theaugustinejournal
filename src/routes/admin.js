@@ -12,7 +12,7 @@ import { requireAdmin } from "../middleware/auth.js";
 import { ensureUploadsDir, getUploadsDir } from "../lib/uploads.js";
 import { sanitizeRichHtml } from "../lib/sanitize.js";
 import { isValidAdminUser, verifyAdminPassword } from "../lib/security.js";
-import { sendNewPostEmail } from "../lib/email-service.js";
+import { sendNewPostEmail, sendUnsubscribeConfirmationEmail } from "../lib/email-service.js";
 
 const router = Router();
 
@@ -392,6 +392,12 @@ router.post("/subscribers/:id/delete", requireAdmin, async (req, res, next) => {
     const subscriber = await prisma.subscriber.findUnique({ where: { id: req.params.id } });
     if (!subscriber) return res.status(404).json({ success: false, error: "Subscriber not found." });
     await prisma.subscriber.delete({ where: { id: req.params.id } });
+
+    // Send unsubscribe confirmation email (fire-and-forget)
+    sendUnsubscribeConfirmationEmail({ email: subscriber.email, language: subscriber.language }).catch(err => {
+      console.error("[admin] Failed to send unsubscribe confirmation email:", err?.message || err);
+    });
+
     res.json({ success: true });
   } catch (err) {
     if (isTableMissingError(err)) return res.status(503).send(SCHEMA_NOT_READY);
