@@ -52,6 +52,30 @@ const EMAIL_STRINGS = {
   siteTitle: {
     en: "The Augustine Journal", pt: "O Diário Agostiniano", es: "El Diario Agustiniano",
     fr: "Le Journal Augustinien", de: "Das Augustinische Journal", it: "Il Giornale Agostiniano"
+  },
+  subscribedSubject: {
+    en: "Subscribed", pt: "Inscrito", es: "Suscrito",
+    fr: "Abonné", de: "Abonniert", it: "Iscritto"
+  },
+  subscribedMessage: {
+    en: "Thank you for subscribing to The Augustine Journal",
+    pt: "Obrigado por se inscrever no O Diário Agostiniano",
+    es: "Gracias por suscribirte a El Diario Agustiniano",
+    fr: "Merci de vous être abonné au Le Journal Augustinien",
+    de: "Vielen Dank für Ihr Abonnement des Das Augustinische Journal",
+    it: "Grazie per esserti iscritto a Il Giornale Agostiniano"
+  },
+  unsubscribedSubject: {
+    en: "Unsubscribed", pt: "Inscrição Cancelada", es: "Suscripción Cancelada",
+    fr: "Désabonné", de: "Abgemeldet", it: "Iscrizione Annullata"
+  },
+  unsubscribedMessage: {
+    en: "We are sorry to see you go and would like to thank you for the time you've invested in us",
+    pt: "Lamentamos vê-lo partir e gostaríamos de agradecer pelo tempo que investiu em nós",
+    es: "Lamentamos verte partir y nos gustaría agradecerte por el tiempo que has invertido en nosotros",
+    fr: "Nous sommes désolés de vous voir partir et nous tenons à vous remercier pour le temps que vous nous avez consacré",
+    de: "Es tut uns leid, Sie gehen zu sehen, und wir möchten Ihnen für die Zeit danken, die Sie in uns investiert haben",
+    it: "Ci dispiace vederti andare e vorremmo ringraziarti per il tempo che hai investito in noi"
   }
 };
 
@@ -138,6 +162,71 @@ function buildEmailHtml({ subject, message, postTitle, postUrl, unsubscribeUrl, 
           </p>
         </td></tr>
 
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
+}
+
+/* ── Build simple HTML email (no post link) ── */
+function buildSimpleEmailHtml({ subject, message, unsubscribeUrl, lang }) {
+  const unsubscribeSection = unsubscribeUrl ? `
+        <!-- Decorative rule -->
+        <tr bgcolor="#0a0a0e"><td align="center" bgcolor="#0a0a0e" style="background-color:#0a0a0e;padding:0 0 20px;">
+          <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="margin:0;"><tr><td style="height:1px;background-color:#1c1c20;font-size:1px;line-height:1px;">&nbsp;</td></tr></table>
+        </td></tr>
+
+        <!-- Unsubscribe -->
+        <tr bgcolor="#0a0a0e"><td align="center" bgcolor="#0a0a0e" style="background-color:#0a0a0e;padding:0;">
+          <p style="margin:0;font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;font-size:11px;color:#5c5c67;letter-spacing:0.3px;">
+            ${t("dontWantEmails", lang)} <a href="${unsubscribeUrl}" style="color:#5c5c67;text-decoration:underline;">${t("unsubscribeLinkText", lang)}</a>
+          </p>
+        </td></tr>` : "";
+
+  return `<!DOCTYPE html>
+<html lang="${lang || "en"}" xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="color-scheme" content="dark"/>
+  <meta name="supported-color-schemes" content="dark"/>
+  <title>${subject}</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&family=Inter:wght@300;400;500&display=swap');
+    :root { color-scheme: dark; supported-color-schemes: dark; }
+    body, table, td { background-color: #0a0a0e !important; }
+  </style>
+  <!--[if mso]>
+  <style>body,table,td{background:#0a0a0e !important;}</style>
+  <![endif]-->
+</head>
+<body bgcolor="#0a0a0e" style="margin:0;padding:0;background-color:#0a0a0e;color:#e8e8ed;font-family:'Cormorant Garamond',Georgia,'Times New Roman',serif;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" bgcolor="#0a0a0e" style="background-color:#0a0a0e;margin:0;padding:0;">
+    <tr bgcolor="#0a0a0e">
+      <td align="center" bgcolor="#0a0a0e" style="background-color:#0a0a0e;padding:40px 20px;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" bgcolor="#0a0a0e" style="background-color:#0a0a0e;max-width:560px;">
+
+        <!-- Title: The Augustine Journal -->
+        <tr bgcolor="#0a0a0e"><td align="center" bgcolor="#0a0a0e" style="background-color:#0a0a0e;padding:0 0 24px;">
+          <h1 style="margin:0;font-family:'Cormorant Garamond',Georgia,serif;font-size:28px;font-weight:500;letter-spacing:0.5px;color:#e8e8ed;">${t("siteTitle", lang)}</h1>
+        </td></tr>
+
+        <!-- Cathedral artwork (ringing bell) -->
+        <tr bgcolor="#0a0a0e"><td align="center" bgcolor="#0a0a0e" style="background-color:#0a0a0e;padding:0 0 28px;">
+          ${cathedralRingingSvg}
+        </td></tr>
+
+        <!-- Decorative rule -->
+        <tr bgcolor="#0a0a0e"><td align="center" bgcolor="#0a0a0e" style="background-color:#0a0a0e;padding:0 0 24px;">
+          <table role="presentation" cellpadding="0" cellspacing="0" width="200" style="margin:0 auto;"><tr><td style="height:1px;background-color:#2b1c3e;font-size:1px;line-height:1px;">&nbsp;</td></tr></table>
+        </td></tr>
+
+        <!-- Message -->
+        <tr bgcolor="#0a0a0e"><td align="center" bgcolor="#0a0a0e" style="background-color:#0a0a0e;padding:0 0 24px;">
+          <p style="margin:0;font-family:'Cormorant Garamond',Georgia,serif;font-size:18px;line-height:1.7;color:#ccccd1;">${message}</p>
+        </td></tr>
+${unsubscribeSection}
       </table>
     </td></tr>
   </table>
@@ -275,4 +364,32 @@ export async function sendWeeklyThrowbackEmail() {
   });
 
   console.log(`[email] Weekly throwback sent to ${subscribers.length} subscriber(s): "${post.title}"`);
+}
+
+/* ── Send subscribe confirmation email ── */
+export async function sendSubscribeConfirmationEmail({ email, language }) {
+  const lang = language || "en";
+  const siteUrl = SITE_URL();
+  const subject = t("subscribedSubject", lang);
+  const message = t("subscribedMessage", lang);
+  const unsubscribeUrl = `${siteUrl}/api/unsubscribe?email=${encodeURIComponent(email)}&lang=${lang}`;
+
+  const html = buildSimpleEmailHtml({ subject, message, unsubscribeUrl, lang });
+  const sent = await sendEmail({ to: email, subject, html, unsubscribeUrl });
+  if (sent) {
+    console.log(`[email] Subscribe confirmation sent to ${email}.`);
+  }
+}
+
+/* ── Send unsubscribe confirmation email ── */
+export async function sendUnsubscribeConfirmationEmail({ email, language }) {
+  const lang = language || "en";
+  const subject = t("unsubscribedSubject", lang);
+  const message = t("unsubscribedMessage", lang);
+
+  const html = buildSimpleEmailHtml({ subject, message, lang });
+  const sent = await sendEmail({ to: email, subject, html });
+  if (sent) {
+    console.log(`[email] Unsubscribe confirmation sent to ${email}.`);
+  }
 }

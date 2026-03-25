@@ -3,6 +3,7 @@ import { Router } from "express";
 import { nanoid } from "nanoid";
 import { getPrisma } from "../lib/db.js";
 import { translateTextIfConfigured } from "../lib/translate.js";
+import { sendSubscribeConfirmationEmail, sendUnsubscribeConfirmationEmail } from "../lib/email-service.js";
 
 const router = Router();
 
@@ -62,6 +63,11 @@ router.post("/subscribe", async (req, res) => {
       data: { id: nanoid(), email, language }
     });
 
+    // Send confirmation email (fire-and-forget)
+    sendSubscribeConfirmationEmail({ email, language }).catch(err => {
+      console.error("[api/subscribe] confirmation email failed:", err?.message || err);
+    });
+
     return res.json({ success: true });
   } catch (err) {
     console.error("[api/subscribe] failed:", err?.message || err);
@@ -80,10 +86,19 @@ router.get("/unsubscribe", async (req, res) => {
     }
 
     const prisma = getPrisma();
+    let wasSubscribed = false;
     try {
       await prisma.subscriber.delete({ where: { email } });
+      wasSubscribed = true;
     } catch {
       // Already unsubscribed or doesn't exist — that's fine
+    }
+
+    // Send unsubscribe confirmation email (fire-and-forget)
+    if (wasSubscribed) {
+      sendUnsubscribeConfirmationEmail({ email, language: lang }).catch(err => {
+        console.error("[api/unsubscribe] confirmation email failed:", err?.message || err);
+      });
     }
 
     // i18n site titles
