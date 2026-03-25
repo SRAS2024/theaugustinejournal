@@ -129,7 +129,8 @@ router.get("/post/:slug", async (req, res, next) => {
       // View tracking should never break the page
     }
 
-    res.render("post", { settings, notices, post });
+    const siteUrl = (process.env.SITE_URL || "https://theaugustinejournal.com").replace(/\/+$/, "");
+    res.render("post", { settings, notices, post, siteUrl });
   } catch (err) {
     next(err);
   }

@@ -5,13 +5,31 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="detected-lang" content="<%= typeof detectedLang !== 'undefined' ? detectedLang : 'en' %>" />
     <meta name="theme-color" content="#0a0a0e" />
-    <meta name="description" content="The Augustine Journal, thoughtful reflection and discourse." />
+    <meta name="description" content="<%= typeof ogDescription !== 'undefined' && ogDescription ? ogDescription : 'The Augustine Journal, thoughtful reflection and discourse.' %>" />
     <meta name="csrf-token" content="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>" />
     <title><%= title %></title>
+    <link rel="canonical" href="<%= typeof ogUrl !== 'undefined' && ogUrl ? ogUrl : 'https://theaugustinejournal.com' %>" />
     <link rel="icon" href="/public/icons/favicon.ico" sizes="48x48" />
     <link rel="icon" href="/public/icons/favicon.svg" type="image/svg+xml" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/public/icons/favicon-16.png" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/public/icons/favicon-32.png" />
+    <link rel="icon" type="image/png" sizes="48x48" href="/public/icons/favicon-48.png" />
     <link rel="apple-touch-icon" href="/public/icons/apple-touch-icon.png" />
     <link rel="manifest" href="/public/site.webmanifest" />
+    <!-- Open Graph (Facebook, LinkedIn, iMessage, WhatsApp, Discord, etc.) -->
+    <meta property="og:type" content="<%= typeof ogType !== 'undefined' && ogType ? ogType : 'website' %>" />
+    <meta property="og:site_name" content="The Augustine Journal" />
+    <meta property="og:title" content="<%= typeof ogTitle !== 'undefined' && ogTitle ? ogTitle : title %>" />
+    <meta property="og:description" content="<%= typeof ogDescription !== 'undefined' && ogDescription ? ogDescription : 'The Augustine Journal, thoughtful reflection and discourse.' %>" />
+    <meta property="og:url" content="<%= typeof ogUrl !== 'undefined' && ogUrl ? ogUrl : 'https://theaugustinejournal.com' %>" />
+    <meta property="og:image" content="<%= typeof ogImage !== 'undefined' && ogImage ? ogImage : 'https://theaugustinejournal.com/public/icons/icon-512.png' %>" />
+    <meta property="og:image:width" content="<%= typeof ogImageWidth !== 'undefined' && ogImageWidth ? ogImageWidth : '512' %>" />
+    <meta property="og:image:height" content="<%= typeof ogImageHeight !== 'undefined' && ogImageHeight ? ogImageHeight : '512' %>" />
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="<%= typeof ogTitle !== 'undefined' && ogTitle ? ogTitle : title %>" />
+    <meta name="twitter:description" content="<%= typeof ogDescription !== 'undefined' && ogDescription ? ogDescription : 'The Augustine Journal, thoughtful reflection and discourse.' %>" />
+    <meta name="twitter:image" content="<%= typeof ogImage !== 'undefined' && ogImage ? ogImage : 'https://theaugustinejournal.com/public/icons/icon-512.png' %>" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Inter:wght@300;400;500&display=swap" rel="stylesheet" />
