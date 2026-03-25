@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="detected-lang" content="<%= typeof detectedLang !== 'undefined' ? detectedLang : 'en' %>" />
     <meta name="robots" content="noindex, nofollow" />
+    <meta name="csrf-token" content="<%= csrfToken %>" />
     <title>Subscribers | The Augustine Journal</title>
     <link rel="icon" href="/public/icons/favicon.ico" sizes="48x48" />
     <link rel="icon" href="/public/icons/favicon.svg" type="image/svg+xml" />
@@ -43,11 +44,19 @@
             <span class="muted"><%= subscribers.length %> <span data-i18n="subscriberCount">subscriber(s)</span></span>
           </div>
           <% subscribers.forEach(function(sub) { %>
-            <div class="postRow" style="flex-direction:column;gap:4px;">
-              <div style="font-family:var(--font-sans);font-size:14px;font-weight:400;"><%= sub.email %></div>
-              <div style="display:flex;gap:12px;font-family:var(--font-sans);font-size:11px;color:var(--muted);">
-                <span><%= sub.language.toUpperCase() %></span>
-                <span><%= new Date(sub.createdAt).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }) %></span>
+            <div class="postRow" style="align-items:center;">
+              <div style="flex:1;min-width:0;">
+                <div style="font-family:var(--font-sans);font-size:14px;font-weight:400;"><%= sub.email %></div>
+                <div style="display:flex;gap:12px;font-family:var(--font-sans);font-size:11px;color:var(--muted);margin-top:4px;">
+                  <span><%= sub.language.toUpperCase() %></span>
+                  <span><%= new Date(sub.createdAt).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }) %></span>
+                </div>
+              </div>
+              <div style="flex-shrink:0;">
+                <button class="btn danger unsubscribe-btn" type="button" data-i18n="unsubscribe"
+                  data-sub-id="<%= sub.id %>"
+                  data-sub-email="<%= sub.email %>"
+                >Unsubscribe</button>
               </div>
             </div>
           <% }); %>
@@ -58,6 +67,133 @@
         </div>
       </section>
     </main>
+
+    <!-- Unsubscribe Confirmation Modal -->
+    <div class="modal-overlay" id="unsubConfirmModal">
+      <div class="modal-box">
+        <p class="modal-message" id="unsubConfirmMessage">Are you sure you want to remove this subscriber?</p>
+        <div class="modal-actions">
+          <button class="btn" type="button" id="cancelUnsubBtn" data-i18n="cancel">Cancel</button>
+          <button class="btn danger" type="button" id="confirmUnsubBtn" data-i18n="confirm">Confirm</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Password Confirmation Modal -->
+    <div class="modal-overlay" id="passwordModal">
+      <div class="modal-box">
+        <p class="modal-message" data-i18n="enterAdminPassword">Please enter administrative password</p>
+        <input type="password" class="form-input" id="adminPasswordInput" autocomplete="off" />
+        <p class="modal-error" id="passwordError" data-i18n="incorrectPassword">Incorrect password.</p>
+        <div class="modal-actions">
+          <button class="btn" type="button" id="cancelPasswordBtn" data-i18n="cancel">Cancel</button>
+          <button class="btn danger" type="button" id="confirmPasswordBtn" data-i18n="confirm">Confirm</button>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      (function() {
+        var unsubId = null;
+        var unsubEmail = null;
+        var csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+
+        var unsubConfirmModal = document.getElementById('unsubConfirmModal');
+        var passwordModal = document.getElementById('passwordModal');
+        var unsubConfirmMessage = document.getElementById('unsubConfirmMessage');
+        var passwordInput = document.getElementById('adminPasswordInput');
+        var passwordError = document.getElementById('passwordError');
+        var confirmPasswordBtn = document.getElementById('confirmPasswordBtn');
+
+        // Attach click handlers to all unsubscribe buttons
+        document.querySelectorAll('.unsubscribe-btn').forEach(function(btn) {
+          btn.addEventListener('click', function() {
+            unsubId = btn.getAttribute('data-sub-id');
+            unsubEmail = btn.getAttribute('data-sub-email');
+            unsubConfirmMessage.textContent = 'Are you sure you want to remove ' + unsubEmail + ' from subscribers?';
+            unsubConfirmModal.classList.add('active');
+          });
+        });
+
+        // First modal: Cancel
+        document.getElementById('cancelUnsubBtn').addEventListener('click', function() {
+          unsubConfirmModal.classList.remove('active');
+          unsubId = null;
+          unsubEmail = null;
+        });
+
+        // First modal: Confirm → open password modal
+        document.getElementById('confirmUnsubBtn').addEventListener('click', function() {
+          unsubConfirmModal.classList.remove('active');
+          passwordInput.value = '';
+          passwordError.style.display = 'none';
+          passwordModal.classList.add('active');
+          passwordInput.focus();
+        });
+
+        // Second modal: Cancel
+        document.getElementById('cancelPasswordBtn').addEventListener('click', function() {
+          passwordModal.classList.remove('active');
+          unsubId = null;
+          unsubEmail = null;
+        });
+
+        // Second modal: Confirm with password
+        function submitPassword() {
+          var password = passwordInput.value;
+          if (!password) {
+            passwordError.style.display = 'block';
+            return;
+          }
+          confirmPasswordBtn.disabled = true;
+          confirmPasswordBtn.textContent = '...';
+
+          fetch('/admin/subscribers/' + encodeURIComponent(unsubId) + '/delete', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-csrf-token': csrfToken
+            },
+            body: JSON.stringify({ password: password })
+          }).then(function(res) {
+            return res.json();
+          }).then(function(data) {
+            if (data.success) {
+              window.location.href = '/admin/subscribers';
+            } else {
+              passwordError.style.display = 'block';
+              confirmPasswordBtn.disabled = false;
+              confirmPasswordBtn.textContent = 'Confirm';
+            }
+          }).catch(function() {
+            passwordError.style.display = 'block';
+            confirmPasswordBtn.disabled = false;
+            confirmPasswordBtn.textContent = 'Confirm';
+          });
+        }
+
+        confirmPasswordBtn.addEventListener('click', submitPassword);
+        passwordInput.addEventListener('keydown', function(e) {
+          if (e.key === 'Enter') submitPassword();
+        });
+
+        // Close modals when clicking the overlay background
+        unsubConfirmModal.addEventListener('click', function(e) {
+          if (e.target === unsubConfirmModal) {
+            unsubConfirmModal.classList.remove('active');
+            unsubId = null;
+            unsubEmail = null;
+          }
+        });
+        passwordModal.addEventListener('click', function(e) {
+          if (e.target === passwordModal) {
+            passwordModal.classList.remove('active');
+            unsubId = null;
+            unsubEmail = null;
+          }
+        });
+      })();
+    </script>
 
     <script src="/public/js/i18n.js"></script>
   </body>

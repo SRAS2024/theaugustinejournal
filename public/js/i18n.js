@@ -204,6 +204,48 @@
       fr: "Aucun abonn\u00e9 pour le moment.",
       de: "Noch keine Abonnenten.",
       it: "Nessun iscritto ancora."
+    },
+
+    /* ── Admin: unsubscribe ── */
+    unsubscribe: {
+      en: "Unsubscribe", pt: "Cancelar inscri\u00e7\u00e3o", es: "Cancelar suscripci\u00f3n",
+      fr: "D\u00e9sabonner", de: "Abmelden", it: "Annulla iscrizione"
+    },
+    confirm: {
+      en: "Confirm", pt: "Confirmar", es: "Confirmar",
+      fr: "Confirmer", de: "Best\u00e4tigen", it: "Conferma"
+    },
+    enterAdminPassword: {
+      en: "Please enter administrative password",
+      pt: "Por favor, insira a senha administrativa",
+      es: "Por favor, ingrese la contrase\u00f1a administrativa",
+      fr: "Veuillez entrer le mot de passe administratif",
+      de: "Bitte geben Sie das Administratorkennwort ein",
+      it: "Inserisci la password amministrativa"
+    },
+    incorrectPassword: {
+      en: "Incorrect password.",
+      pt: "Senha incorreta.",
+      es: "Contrase\u00f1a incorrecta.",
+      fr: "Mot de passe incorrect.",
+      de: "Falsches Passwort.",
+      it: "Password errata."
+    },
+
+    /* ── Subscribe success ── */
+    subscribed: {
+      en: "Subscribed!", pt: "Inscrito!", es: "\u00a1Suscrito!",
+      fr: "Abonn\u00e9\u00a0!", de: "Abonniert!", it: "Iscritto!"
+    },
+
+    /* ── Site title ── */
+    siteTitle: {
+      en: "The Augustine Journal",
+      pt: "O Di\u00e1rio Agostiniano",
+      es: "El Diario Agustiniano",
+      fr: "Le Journal Augustinien",
+      de: "Das Augustinische Journal",
+      it: "Il Giornale Agostiniano"
     }
   };
 

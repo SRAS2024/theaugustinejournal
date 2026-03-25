@@ -86,14 +86,21 @@ router.get("/unsubscribe", async (req, res) => {
       // Already unsubscribed or doesn't exist — that's fine
     }
 
+    // i18n site titles
+    const siteTitles = {
+      en: "The Augustine Journal", pt: "O Diário Agostiniano", es: "El Diario Agustiniano",
+      fr: "Le Journal Augustinien", de: "Das Augustinische Journal", it: "Il Giornale Agostiniano"
+    };
+    const siteTitle = siteTitles[lang] || siteTitles.en;
+
     // i18n messages for the unsubscribe confirmation page
     const messages = {
-      en: { title: "Unsubscribed", message: "You have been successfully unsubscribed from The Augustine Journal emails." },
-      pt: { title: "Inscrição Cancelada", message: "Sua inscrição nos emails do The Augustine Journal foi cancelada com sucesso." },
-      es: { title: "Suscripción Cancelada", message: "Se ha cancelado exitosamente su suscripción a los correos de The Augustine Journal." },
-      fr: { title: "Désabonné", message: "Vous avez été désabonné avec succès des emails de The Augustine Journal." },
-      de: { title: "Abgemeldet", message: "Sie wurden erfolgreich von den E-Mails des The Augustine Journal abgemeldet." },
-      it: { title: "Iscrizione Annullata", message: "La tua iscrizione alle email di The Augustine Journal è stata annullata con successo." }
+      en: { title: "Unsubscribed", message: `You have been successfully unsubscribed from ${siteTitle} emails.` },
+      pt: { title: "Inscrição Cancelada", message: `Sua inscrição nos emails do ${siteTitle} foi cancelada com sucesso.` },
+      es: { title: "Suscripción Cancelada", message: `Se ha cancelado exitosamente su suscripción a los correos de ${siteTitle}.` },
+      fr: { title: "Désabonné", message: `Vous avez été désabonné avec succès des emails de ${siteTitle}.` },
+      de: { title: "Abgemeldet", message: `Sie wurden erfolgreich von den E-Mails des ${siteTitle} abgemeldet.` },
+      it: { title: "Iscrizione Annullata", message: `La tua iscrizione alle email di ${siteTitle} è stata annullata con successo.` }
     };
 
     const m = messages[lang] || messages.en;
@@ -103,7 +110,7 @@ router.get("/unsubscribe", async (req, res) => {
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
-  <title>${m.title} | The Augustine Journal</title>
+  <title>${m.title} | ${siteTitle}</title>
   <link rel="preconnect" href="https://fonts.googleapis.com"/>
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&family=Inter:wght@300;400;500&display=swap" rel="stylesheet"/>
@@ -120,7 +127,7 @@ router.get("/unsubscribe", async (req, res) => {
   <div class="box">
     <h1>${m.title}</h1>
     <p>${m.message}</p>
-    <a href="/">The Augustine Journal</a>
+    <a href="/">${siteTitle}</a>
   </div>
 </body>
 </html>`);

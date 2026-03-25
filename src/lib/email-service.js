@@ -48,6 +48,10 @@ const EMAIL_STRINGS = {
     en: "Don't want to receive emails?", pt: "Não quer receber emails?",
     es: "¿No quieres recibir correos?", fr: "Vous ne souhaitez plus recevoir d'emails\u00a0?",
     de: "Sie möchten keine E-Mails mehr erhalten?", it: "Non vuoi ricevere email?"
+  },
+  siteTitle: {
+    en: "The Augustine Journal", pt: "O Diário Agostiniano", es: "El Diario Agustiniano",
+    fr: "Le Journal Augustinien", de: "Das Augustinische Journal", it: "Il Giornale Agostiniano"
   }
 };
 
@@ -99,7 +103,7 @@ function buildEmailHtml({ subject, message, postTitle, postUrl, unsubscribeUrl, 
 
         <!-- Title: The Augustine Journal -->
         <tr bgcolor="#0a0a0e"><td align="center" bgcolor="#0a0a0e" style="background-color:#0a0a0e;padding:0 0 24px;">
-          <h1 style="margin:0;font-family:'Cormorant Garamond',Georgia,serif;font-size:28px;font-weight:500;letter-spacing:0.5px;color:#e8e8ed;">The Augustine Journal</h1>
+          <h1 style="margin:0;font-family:'Cormorant Garamond',Georgia,serif;font-size:28px;font-weight:500;letter-spacing:0.5px;color:#e8e8ed;">${t("siteTitle", lang)}</h1>
         </td></tr>
 
         <!-- Cathedral artwork (ringing bell) -->
