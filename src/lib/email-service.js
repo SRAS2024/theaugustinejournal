@@ -4,7 +4,32 @@ import { getPrisma } from "./db.js";
 import { cathedralRingingSvg } from "./cathedral-svg.js";
 
 const SENDER = "The Augustine Journal <notifications@theaugustinejournal.com>";
+const REPLY_TO = "The Augustine Journal <notifications@theaugustinejournal.com>";
 const SITE_URL = () => (process.env.SITE_URL || "https://theaugustinejournal.com").replace(/\/+$/, "");
+
+/* ── Helpers ── */
+
+/** Strip HTML tags and decode common entities to produce a plain-text version */
+function htmlToPlainText(html) {
+  return html
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/p>/gi, "\n\n")
+    .replace(/<\/tr>/gi, "\n")
+    .replace(/<[^>]+>/g, "")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/&quot;/gi, '"')
+    .replace(/&#039;/gi, "'")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+/** Sleep helper for rate-limiting and retry backoff */
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
 
 /* ── i18n strings for emails ── */
 const EMAIL_STRINGS = {
@@ -102,6 +127,7 @@ function t(key, lang) {
  *   purple decorative                         →  #2b1c3e
  */
 function buildEmailHtml({ subject, message, postTitle, postUrl, unsubscribeUrl, lang }) {
+  const preheader = `${message} — ${postTitle}`;
   return `<!DOCTYPE html>
 <html lang="${lang || "en"}" xmlns="http://www.w3.org/1999/xhtml">
 <head>
@@ -120,6 +146,8 @@ function buildEmailHtml({ subject, message, postTitle, postUrl, unsubscribeUrl, 
   <![endif]-->
 </head>
 <body bgcolor="#0a0a0e" style="margin:0;padding:0;background-color:#0a0a0e;color:#e8e8ed;font-family:'Cormorant Garamond',Georgia,'Times New Roman',serif;">
+  <!-- Preheader text (visible in inbox preview, hidden in email body) -->
+  <div style="display:none;font-size:1px;color:#0a0a0e;line-height:1px;max-height:0px;max-width:0px;opacity:0;overflow:hidden;">${preheader}${"&#847; &zwnj; &nbsp; ".repeat(30)}</div>
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" bgcolor="#0a0a0e" style="background-color:#0a0a0e;margin:0;padding:0;">
     <tr bgcolor="#0a0a0e">
       <td align="center" bgcolor="#0a0a0e" style="background-color:#0a0a0e;padding:40px 20px;">
@@ -171,6 +199,7 @@ function buildEmailHtml({ subject, message, postTitle, postUrl, unsubscribeUrl, 
 
 /* ── Build simple HTML email (no post link) ── */
 function buildSimpleEmailHtml({ subject, message, unsubscribeUrl, lang }) {
+  const preheader = `${message} — ${t("siteTitle", lang)}`;
   const unsubscribeSection = unsubscribeUrl ? `
         <!-- Decorative rule -->
         <tr bgcolor="#0a0a0e"><td align="center" bgcolor="#0a0a0e" style="background-color:#0a0a0e;padding:0 0 20px;">
@@ -202,6 +231,8 @@ function buildSimpleEmailHtml({ subject, message, unsubscribeUrl, lang }) {
   <![endif]-->
 </head>
 <body bgcolor="#0a0a0e" style="margin:0;padding:0;background-color:#0a0a0e;color:#e8e8ed;font-family:'Cormorant Garamond',Georgia,'Times New Roman',serif;">
+  <!-- Preheader text (visible in inbox preview, hidden in email body) -->
+  <div style="display:none;font-size:1px;color:#0a0a0e;line-height:1px;max-height:0px;max-width:0px;opacity:0;overflow:hidden;">${preheader}${"&#847; &zwnj; &nbsp; ".repeat(30)}</div>
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" bgcolor="#0a0a0e" style="background-color:#0a0a0e;margin:0;padding:0;">
     <tr bgcolor="#0a0a0e">
       <td align="center" bgcolor="#0a0a0e" style="background-color:#0a0a0e;padding:40px 20px;">
@@ -235,47 +266,98 @@ ${unsubscribeSection}
 }
 
 /* ── Send email via Resend API ── */
-async function sendEmail({ to, subject, html, unsubscribeUrl }) {
+/*
+ * Deliverability improvements:
+ *   1. Plain-text alternative (multipart) — HTML-only emails are penalised by
+ *      Gmail, Outlook, Yahoo, and most corporate filters.
+ *   2. Reply-To header — missing reply-to is a spam signal.
+ *   3. X-Entity-Ref-ID — unique per email, prevents unwanted conversation
+ *      threading in Outlook and some webmail clients.
+ *   4. Retry with exponential back-off — transient 429 / 5xx from Resend
+ *      no longer silently lose the email.
+ *   5. Resend "tags" — helps with tracking in the Resend dashboard.
+ */
+const MAX_RETRIES = 3;
+const RETRY_BASE_MS = 2000; // 2s, 4s, 8s
+
+async function sendEmail({ to, subject, html, unsubscribeUrl, tag }) {
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) {
     console.warn("[email] RESEND_API_KEY not set. Skipping email send.");
     return false;
   }
 
-  try {
-    const headers = {
-      "Authorization": `Bearer ${apiKey}`,
-      "Content-Type": "application/json"
-    };
+  // Build plain-text version from the HTML for multipart/alternative
+  const text = htmlToPlainText(html);
 
-    const body = JSON.stringify({
-      from: SENDER,
-      to: [to],
-      subject,
-      html,
-      headers: unsubscribeUrl ? {
-        "List-Unsubscribe": `<${unsubscribeUrl}>`,
-        "List-Unsubscribe-Post": "List-Unsubscribe=One-Click"
-      } : undefined
-    });
+  // Unique ID per message to prevent threading issues in Outlook / webmail
+  const entityRefId = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 
-    const resp = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers,
-      body
-    });
+  const emailHeaders = {
+    "X-Entity-Ref-ID": entityRefId
+  };
+  if (unsubscribeUrl) {
+    emailHeaders["List-Unsubscribe"] = `<${unsubscribeUrl}>`;
+    emailHeaders["List-Unsubscribe-Post"] = "List-Unsubscribe=One-Click";
+  }
 
-    if (!resp.ok) {
-      const text = await resp.text();
-      console.error(`[email] Resend API error ${resp.status}:`, text);
+  const payload = {
+    from: SENDER,
+    reply_to: REPLY_TO,
+    to: [to],
+    subject,
+    html,
+    text,
+    headers: emailHeaders,
+    tags: tag ? [{ name: "category", value: tag }] : undefined
+  };
+
+  const fetchHeaders = {
+    "Authorization": `Bearer ${apiKey}`,
+    "Content-Type": "application/json"
+  };
+
+  const body = JSON.stringify(payload);
+
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      const resp = await fetch("https://api.resend.com/emails", {
+        method: "POST",
+        headers: fetchHeaders,
+        body
+      });
+
+      if (resp.ok) {
+        const data = await resp.json().catch(() => null);
+        console.log(`[email] Sent to ${to} (id: ${data?.id || "unknown"})`);
+        return true;
+      }
+
+      const respText = await resp.text();
+
+      // Retry on rate-limit (429) or server errors (5xx)
+      if ((resp.status === 429 || resp.status >= 500) && attempt < MAX_RETRIES) {
+        const delay = RETRY_BASE_MS * Math.pow(2, attempt);
+        console.warn(`[email] Resend ${resp.status} for ${to}, retrying in ${delay}ms (attempt ${attempt + 1}/${MAX_RETRIES})…`);
+        await sleep(delay);
+        continue;
+      }
+
+      console.error(`[email] Resend API error ${resp.status} for ${to}:`, respText);
+      return false;
+    } catch (err) {
+      if (attempt < MAX_RETRIES) {
+        const delay = RETRY_BASE_MS * Math.pow(2, attempt);
+        console.warn(`[email] Network error for ${to}, retrying in ${delay}ms (attempt ${attempt + 1}/${MAX_RETRIES}):`, err?.message);
+        await sleep(delay);
+        continue;
+      }
+      console.error(`[email] Failed to send to ${to} after ${MAX_RETRIES + 1} attempts:`, err?.message || err);
       return false;
     }
-
-    return true;
-  } catch (err) {
-    console.error("[email] Failed to send:", err?.message || err);
-    return false;
   }
+
+  return false;
 }
 
 /* ── Send new post notification to all subscribers ── */
@@ -287,7 +369,8 @@ export async function sendNewPostEmail(post) {
   const siteUrl = SITE_URL();
   const postUrl = `${siteUrl}/post/${post.slug}`;
 
-  for (const sub of subscribers) {
+  for (let i = 0; i < subscribers.length; i++) {
+    const sub = subscribers[i];
     const lang = sub.language || "en";
     const subject = t("newPostTitle", lang);
     const message = t("newPostMessage", lang);
@@ -295,7 +378,10 @@ export async function sendNewPostEmail(post) {
     const unsubscribeUrl = `${siteUrl}/api/unsubscribe?email=${encodeURIComponent(sub.email)}&lang=${lang}`;
 
     const html = buildEmailHtml({ subject, message, postTitle, postUrl, unsubscribeUrl, lang });
-    await sendEmail({ to: sub.email, subject, html, unsubscribeUrl });
+    await sendEmail({ to: sub.email, subject, html, unsubscribeUrl, tag: "new_post" });
+
+    // Small delay between sends to avoid rate-limiting
+    if (i < subscribers.length - 1) await sleep(250);
   }
 
   // Log the email
@@ -339,7 +425,8 @@ export async function sendWeeklyThrowbackEmail() {
   const siteUrl = SITE_URL();
   const postUrl = `${siteUrl}/post/${post.slug}`;
 
-  for (const sub of subscribers) {
+  for (let i = 0; i < subscribers.length; i++) {
+    const sub = subscribers[i];
     const lang = sub.language || "en";
     const subject = t("weeklyThrowbackTitle", lang);
     const message = t("weeklyThrowbackMessage", lang);
@@ -347,7 +434,10 @@ export async function sendWeeklyThrowbackEmail() {
     const unsubscribeUrl = `${siteUrl}/api/unsubscribe?email=${encodeURIComponent(sub.email)}&lang=${lang}`;
 
     const html = buildEmailHtml({ subject, message, postTitle, postUrl, unsubscribeUrl, lang });
-    await sendEmail({ to: sub.email, subject, html, unsubscribeUrl });
+    await sendEmail({ to: sub.email, subject, html, unsubscribeUrl, tag: "weekly_throwback" });
+
+    // Small delay between sends to avoid rate-limiting
+    if (i < subscribers.length - 1) await sleep(250);
   }
 
   // Update tracker
@@ -375,7 +465,7 @@ export async function sendSubscribeConfirmationEmail({ email, language }) {
   const unsubscribeUrl = `${siteUrl}/api/unsubscribe?email=${encodeURIComponent(email)}&lang=${lang}`;
 
   const html = buildSimpleEmailHtml({ subject, message, unsubscribeUrl, lang });
-  const sent = await sendEmail({ to: email, subject, html, unsubscribeUrl });
+  const sent = await sendEmail({ to: email, subject, html, unsubscribeUrl, tag: "subscribe_confirmation" });
   if (sent) {
     console.log(`[email] Subscribe confirmation sent to ${email}.`);
   }
@@ -388,7 +478,7 @@ export async function sendUnsubscribeConfirmationEmail({ email, language }) {
   const message = t("unsubscribedMessage", lang);
 
   const html = buildSimpleEmailHtml({ subject, message, lang });
-  const sent = await sendEmail({ to: email, subject, html });
+  const sent = await sendEmail({ to: email, subject, html, tag: "unsubscribe_confirmation" });
   if (sent) {
     console.log(`[email] Unsubscribe confirmation sent to ${email}.`);
   }
