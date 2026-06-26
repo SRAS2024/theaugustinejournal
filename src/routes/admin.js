@@ -13,6 +13,7 @@ import { ensureUploadsDir, getUploadsDir } from "../lib/uploads.js";
 import { sanitizeRichHtml } from "../lib/sanitize.js";
 import { isValidAdminUser, verifyAdminPassword } from "../lib/security.js";
 import { sendNewPostEmail, sendUnsubscribeConfirmationEmail } from "../lib/email-service.js";
+import { submitPost } from "../lib/indexnow.js";
 
 const router = Router();
 
@@ -539,6 +540,9 @@ router.post("/posts/create", requireAdmin, upload.single("pdfFile"), async (req,
       console.error("[admin] Failed to send new post email:", err?.message || err);
     });
 
+    // Fire-and-forget: notify search engines so the new post gets crawled promptly
+    submitPost(newPost).catch(() => {});
+
     res.redirect("/admin/posts?saved=true");
   } catch (err) {
     if (isTableMissingError(err)) return res.status(503).send(SCHEMA_NOT_READY);
@@ -645,10 +649,13 @@ router.post("/posts/:id/update", requireAdmin, upload.single("pdfFile"), async (
       if (collision && collision.id !== existing.id) newSlug = `${newSlug}-${nanoid(6)}`;
     }
 
-    await prisma.post.update({
+    const updatedPost = await prisma.post.update({
       where: { id },
       data: { slug: newSlug, type, title, postDate, contentType, contentHtml, pdfPath, autoTranslateTitle }
     });
+
+    // Fire-and-forget: notify search engines so the updated post gets re-crawled
+    submitPost(updatedPost).catch(() => {});
 
     res.redirect("/admin/posts?saved=true");
   } catch (err) {
@@ -673,6 +680,11 @@ router.post("/posts/:id/delete", requireAdmin, async (req, res, next) => {
     await deletePdfFromDb(post.pdfPath);
     deletePdfFile(post.pdfPath);
     await prisma.post.delete({ where: { id: req.params.id } });
+
+    // Fire-and-forget: notify search engines so the removed URL is re-crawled
+    // (now a 404) and the section/home pages are refreshed.
+    submitPost(post).catch(() => {});
+
     res.json({ success: true });
   } catch (err) {
     if (isTableMissingError(err)) return res.status(503).send(SCHEMA_NOT_READY);

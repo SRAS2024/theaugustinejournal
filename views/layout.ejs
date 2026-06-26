@@ -30,6 +30,9 @@
     <meta name="twitter:title" content="<%= typeof ogTitle !== 'undefined' && ogTitle ? ogTitle : title %>" />
     <meta name="twitter:description" content="<%= typeof ogDescription !== 'undefined' && ogDescription ? ogDescription : 'The Augustine Journal, thoughtful reflection and discourse.' %>" />
     <meta name="twitter:image" content="<%= typeof ogImage !== 'undefined' && ogImage ? ogImage : 'https://theaugustinejournal.com/public/icons/icon-512.png' %>" />
+    <% if (typeof jsonLd !== 'undefined' && jsonLd) { %>
+    <script type="application/ld+json"><%- jsonLd %></script>
+    <% } %>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Inter:wght@300;400;500&display=swap" rel="stylesheet" />

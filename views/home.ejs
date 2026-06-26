@@ -289,4 +289,10 @@
   `;
 %>
 
-<%- include("layout", { title: "The Augustine Journal", active: "home", body }) %>
+<%- include("layout", {
+  title: "The Augustine Journal",
+  active: "home",
+  body,
+  ogUrl: typeof canonical !== 'undefined' ? canonical : undefined,
+  jsonLd: typeof jsonLd !== 'undefined' ? jsonLd : undefined
+}) %>
