@@ -16,7 +16,8 @@ A clean, professional journal and blog platform with built-in newsletter functio
 - **Individual post pages** with view tracking, share button, and optional original PDF link
 - **Responsive design** with mobile hamburger menu navigation
 - **Auto-translation** into 6 languages (English, Portuguese, Spanish, French, German, Italian) via built-in i18n dictionaries and Google Translate integration
-- **SEO** with auto-generated sitemap.xml, robots.txt, Open Graph meta tags, and Twitter Cards
+- **SEO** with auto-generated sitemap.xml (with `lastmod` on every page), robots.txt, canonical URLs, JSON-LD structured data (Article + WebSite), Open Graph meta tags, and Twitter Cards
+- **IndexNow** pings search engines (Bing, DuckDuckGo, Yandex, …) automatically whenever a post is added, edited, or removed so new content is crawled promptly
 - **Share button** using the Web Share API with clipboard fallback
 - **BIMI support** at `/.well-known/bimi` for branded sender icons in email clients
 - Color palette: black, white, grey, and dark purple accents
@@ -165,6 +166,8 @@ theaugustinejournal/
 | `NODE_ENV` | No | Set to `production` for secure cookies and HTTPS enforcement |
 | `SITE_URL` | No | Canonical URL for sitemap and email links (default: https://theaugustinejournal.com) |
 | `RESEND_API_KEY` | No | [Resend](https://resend.com) API key for email delivery |
+| `INDEXNOW_KEY` | No | Fixed IndexNow verification key (auto-generated per process if not set) |
+| `INDEXNOW_DISABLED` | No | Set to `true` to disable IndexNow search-engine pings |
 
 ### Build & Start
 

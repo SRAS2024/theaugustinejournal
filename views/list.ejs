@@ -27,4 +27,11 @@
   `;
 %>
 
-<%- include("layout", { title: `${pageTitle} | The Augustine Journal`, active: pageTitle === "Blog" ? "blog" : pageTitle === "Essays" ? "essays" : "letters", body }) %>
+<%- include("layout", {
+  title: `${pageTitle} | The Augustine Journal`,
+  active: pageTitle === "Blog" ? "blog" : pageTitle === "Essays" ? "essays" : "letters",
+  body,
+  ogUrl: typeof canonical !== 'undefined' ? canonical : undefined,
+  ogTitle: `${pageTitle} | The Augustine Journal`,
+  ogDescription: `${pageTitle} from The Augustine Journal, thoughtful reflection and discourse.`
+}) %>
