@@ -1,7 +1,11 @@
+import crypto from "crypto";
 import bcrypt from "bcryptjs";
 
+const digest = (value) => crypto.createHash("sha256").update(String(value ?? "")).digest();
+
+/** Constant-time username check. */
 export function isValidAdminUser(username) {
-  return username === process.env.ADMIN_USERNAME;
+  return crypto.timingSafeEqual(digest(username), digest(process.env.ADMIN_USERNAME));
 }
 
 let cachedHash = null;
@@ -14,5 +18,5 @@ async function getPasswordHash() {
 
 export async function verifyAdminPassword(password) {
   const hash = await getPasswordHash();
-  return bcrypt.compare(password, hash);
+  return bcrypt.compare(String(password ?? ""), hash);
 }

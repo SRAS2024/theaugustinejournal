@@ -5,13 +5,20 @@
 // for the next scheduled sitemap re-crawl.
 //
 // IndexNow needs a verification key that is publicly reachable at
-// `https://<host>/<key>.txt`. We generate one per process (overridable with
-// the INDEXNOW_KEY env var) and serve it from the public router. Each ping
-// is fully fire-and-forget: any failure is logged and swallowed so it can
-// never affect the admin response.
+// `https://<host>/<key>.txt`. The key comes from the INDEXNOW_KEY env var, or
+// is derived from the deployment's secrets so it stays the same across
+// restarts, and is served from the public router. Each ping is fully
+// fire-and-forget: any failure is logged and swallowed so it can never
+// affect the admin response.
 import crypto from "crypto";
 
-const KEY = (process.env.INDEXNOW_KEY || crypto.randomBytes(16).toString("hex"))
+function defaultKey() {
+  const seed = process.env.SESSION_SECRET || process.env.DATABASE_URL;
+  if (!seed) return crypto.randomBytes(16).toString("hex");
+  return crypto.createHmac("sha256", seed).update("indexnow-key").digest("hex").slice(0, 32);
+}
+
+const KEY = (process.env.INDEXNOW_KEY || defaultKey())
   .replace(/[^a-zA-Z0-9-]/g, "")
   .slice(0, 128);
 
@@ -38,6 +45,8 @@ export function getIndexNowKey() {
 export async function submitUrls(urls) {
   try {
     if (process.env.INDEXNOW_DISABLED === "true") return;
+    // Only the live site may ping (local development uses the production SITE_URL default).
+    if (process.env.NODE_ENV !== "production") return;
 
     const list = [...new Set((Array.isArray(urls) ? urls : [urls]).filter(Boolean))];
     if (!list.length) return;

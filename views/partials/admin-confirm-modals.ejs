@@ -1,0 +1,28 @@
+<!-- Step 1: confirm the action -->
+<div class="modal-overlay" id="confirmModal" role="dialog" aria-modal="true" aria-labelledby="confirmModalMessage">
+  <div class="modal-box">
+    <p class="modal-message" id="confirmModalMessage"></p>
+    <p class="modal-post-name" id="confirmModalItem"></p>
+    <div class="modal-actions">
+      <button class="btn" type="button" id="confirmModalCancel" data-i18n="cancel">Cancel</button>
+      <button class="btn danger" type="button" id="confirmModalOk"></button>
+    </div>
+  </div>
+</div>
+
+<!-- Step 2: administrative password -->
+<div class="modal-overlay" id="passwordModal" role="dialog" aria-modal="true" aria-labelledby="passwordModalMessage">
+  <div class="modal-box">
+    <p class="modal-message" id="passwordModalMessage" data-i18n="enterAdminPassword">Please enter administrative password</p>
+    <form id="passwordForm" novalidate>
+      <input type="text" name="username" autocomplete="username" value="" hidden />
+      <label class="visually-hidden" for="adminPasswordInput" data-i18n="password">Password</label>
+      <input type="password" class="form-input" id="adminPasswordInput" autocomplete="current-password" required />
+      <p class="modal-error" id="passwordError" role="alert"></p>
+      <div class="modal-actions">
+        <button class="btn" type="button" id="cancelPasswordBtn" data-i18n="cancel">Cancel</button>
+        <button class="btn danger" type="submit" id="confirmPasswordBtn" data-i18n="confirm">Confirm</button>
+      </div>
+    </form>
+  </div>
+</div>

@@ -1,14 +1,39 @@
-<!doctype html>
-<html lang="<%= typeof detectedLang !== 'undefined' ? detectedLang : 'en' %>" translate="yes">
+<%
+  const pageTitle = typeof title !== 'undefined' && title ? title : 'The Augustine Journal';
+  const description = typeof ogDescription !== 'undefined' && ogDescription ? ogDescription : 'The Augustine Journal, thoughtful reflection and discourse.';
+  const pageUrl = typeof ogUrl !== 'undefined' && ogUrl ? ogUrl : 'https://theaugustinejournal.com';
+  const image = typeof ogImage !== 'undefined' && ogImage ? ogImage : 'https://theaugustinejournal.com/public/icons/icon-512.png';
+  const docTitleKey = typeof titleKey !== 'undefined' && titleKey ? titleKey : '';
+  const docTitleFrom = typeof titleFrom !== 'undefined' && titleFrom ? titleFrom : '';
+%><!doctype html>
+<html lang="en"<% if (docTitleKey) { %> data-title-key="<%= docTitleKey %>"<% } %><% if (docTitleFrom) { %> data-title-from="<%= docTitleFrom %>"<% } %>>
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <script nonce="<%= cspNonce %>">
+      /* Hide translatable text until it is shown in the reader's language (at most 2.5 s). */
+      (function () {
+        try {
+          var supported = ["en", "es", "pt", "fr", "de", "ru"];
+          var langs = navigator.languages && navigator.languages.length ? navigator.languages : [navigator.language || ""];
+          for (var i = 0; i < langs.length; i++) {
+            var base = String(langs[i] || "").toLowerCase().split("-")[0];
+            if (supported.indexOf(base) === -1) continue;
+            if (base !== "en") {
+              var root = document.documentElement;
+              root.classList.add("i18n-pending");
+              setTimeout(function () { root.classList.remove("i18n-pending"); }, 2500);
+            }
+            return;
+          }
+        } catch (e) {}
+      })();
+    </script>
     <meta name="detected-lang" content="<%= typeof detectedLang !== 'undefined' ? detectedLang : 'en' %>" />
     <meta name="theme-color" content="#0a0a0e" />
-    <meta name="description" content="<%= typeof ogDescription !== 'undefined' && ogDescription ? ogDescription : 'The Augustine Journal, thoughtful reflection and discourse.' %>" />
-    <meta name="csrf-token" content="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>" />
-    <title><%= title %></title>
-    <link rel="canonical" href="<%= typeof ogUrl !== 'undefined' && ogUrl ? ogUrl : 'https://theaugustinejournal.com' %>" />
+    <meta name="description" content="<%= description %>" />
+    <title><%= pageTitle %></title>
+    <link rel="canonical" href="<%= pageUrl %>" />
     <link rel="icon" href="/public/icons/favicon.ico" sizes="48x48" />
     <link rel="icon" href="/public/icons/favicon.svg" type="image/svg+xml" />
     <link rel="icon" type="image/png" sizes="16x16" href="/public/icons/favicon-16.png" />
@@ -19,19 +44,20 @@
     <!-- Open Graph (Facebook, LinkedIn, iMessage, WhatsApp, Discord, etc.) -->
     <meta property="og:type" content="<%= typeof ogType !== 'undefined' && ogType ? ogType : 'website' %>" />
     <meta property="og:site_name" content="The Augustine Journal" />
-    <meta property="og:title" content="<%= typeof ogTitle !== 'undefined' && ogTitle ? ogTitle : title %>" />
-    <meta property="og:description" content="<%= typeof ogDescription !== 'undefined' && ogDescription ? ogDescription : 'The Augustine Journal, thoughtful reflection and discourse.' %>" />
-    <meta property="og:url" content="<%= typeof ogUrl !== 'undefined' && ogUrl ? ogUrl : 'https://theaugustinejournal.com' %>" />
-    <meta property="og:image" content="<%= typeof ogImage !== 'undefined' && ogImage ? ogImage : 'https://theaugustinejournal.com/public/icons/icon-512.png' %>" />
+    <meta property="og:title" content="<%= typeof ogTitle !== 'undefined' && ogTitle ? ogTitle : pageTitle %>" />
+    <meta property="og:description" content="<%= description %>" />
+    <meta property="og:url" content="<%= pageUrl %>" />
+    <meta property="og:image" content="<%= image %>" />
     <meta property="og:image:width" content="<%= typeof ogImageWidth !== 'undefined' && ogImageWidth ? ogImageWidth : '512' %>" />
     <meta property="og:image:height" content="<%= typeof ogImageHeight !== 'undefined' && ogImageHeight ? ogImageHeight : '512' %>" />
+    <meta property="og:locale" content="en_US" />
     <!-- Twitter Card -->
     <meta name="twitter:card" content="summary" />
-    <meta name="twitter:title" content="<%= typeof ogTitle !== 'undefined' && ogTitle ? ogTitle : title %>" />
-    <meta name="twitter:description" content="<%= typeof ogDescription !== 'undefined' && ogDescription ? ogDescription : 'The Augustine Journal, thoughtful reflection and discourse.' %>" />
-    <meta name="twitter:image" content="<%= typeof ogImage !== 'undefined' && ogImage ? ogImage : 'https://theaugustinejournal.com/public/icons/icon-512.png' %>" />
+    <meta name="twitter:title" content="<%= typeof ogTitle !== 'undefined' && ogTitle ? ogTitle : pageTitle %>" />
+    <meta name="twitter:description" content="<%= description %>" />
+    <meta name="twitter:image" content="<%= image %>" />
     <% if (typeof jsonLd !== 'undefined' && jsonLd) { %>
-    <script type="application/ld+json"><%- jsonLd %></script>
+    <script type="application/ld+json" nonce="<%= cspNonce %>"><%- jsonLd %></script>
     <% } %>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -45,7 +71,6 @@
         <feColorMatrix type="saturate" values="0" />
       </filter>
     </svg>
-    <div id="google_translate_element"></div>
 
     <%- include("partials/header", { active }) %>
 

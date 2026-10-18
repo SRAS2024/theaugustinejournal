@@ -1,40 +1,11 @@
 <!doctype html>
-<html lang="<%= typeof detectedLang !== 'undefined' ? detectedLang : 'en' %>" translate="yes">
+<html lang="en" data-title-key="subscribers">
   <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="detected-lang" content="<%= typeof detectedLang !== 'undefined' ? detectedLang : 'en' %>" />
-    <meta name="robots" content="noindex, nofollow" />
-    <meta name="csrf-token" content="<%= csrfToken %>" />
+<%- include("../partials/admin-head") %>
     <title>Subscribers | The Augustine Journal</title>
-    <link rel="icon" href="/public/icons/favicon.ico" sizes="48x48" />
-    <link rel="icon" href="/public/icons/favicon.svg" type="image/svg+xml" />
-    <link rel="icon" type="image/png" sizes="16x16" href="/public/icons/favicon-16.png" />
-    <link rel="icon" type="image/png" sizes="32x32" href="/public/icons/favicon-32.png" />
-    <link rel="icon" type="image/png" sizes="48x48" href="/public/icons/favicon-48.png" />
-    <link rel="apple-touch-icon" href="/public/icons/apple-touch-icon.png" />
-    <link rel="manifest" href="/public/site.webmanifest" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Inter:wght@300;400;500&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="/public/css/styles.css" />
   </head>
   <body>
-    <header class="topbar">
-      <div class="container header-inner">
-        <h1 class="brand notranslate"><a href="/admin/dashboard" style="color:inherit;text-decoration:none;">The Augustine Journal</a></h1>
-        <nav class="admin-nav">
-          <a href="/" data-i18n="viewSite">View Site</a>
-          <a href="/admin/dashboard" data-i18n="dashboard">Dashboard</a>
-          <a href="/admin/posts" data-i18n="posts">Posts</a>
-          <a href="/admin/settings" data-i18n="siteSettings">Site Settings</a>
-          <form method="POST" action="/admin/logout" style="display:inline;margin:0;">
-            <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
-            <button type="submit" data-i18n="logOut">Log out</button>
-          </form>
-        </nav>
-      </div>
-    </header>
+    <%- include("../partials/admin-nav", { current: "" }) %>
 
     <main class="container">
       <section class="section card">
@@ -44,21 +15,24 @@
           <div class="empty-state" data-i18n="noSubscribers">No subscribers yet.</div>
         <% } else { %>
           <div style="margin-bottom:16px;text-align:center;">
-            <span class="muted"><%= subscribers.length %> <span data-i18n="subscriberCount">subscriber(s)</span></span>
+            <span class="muted" data-i18n-count="subscriberCount" data-count="<%= subscribers.length %>"><%= subscribers.length %> <%= subscribers.length === 1 ? 'subscriber' : 'subscribers' %></span>
           </div>
           <% subscribers.forEach(function(sub) { %>
             <div class="postRow" style="align-items:center;">
               <div style="flex:1;min-width:0;">
-                <div style="font-family:var(--font-sans);font-size:14px;font-weight:400;"><%= sub.email %></div>
+                <div style="font-family:var(--font-sans);font-size:14px;font-weight:400;" translate="no"><%= sub.email %></div>
                 <div style="display:flex;gap:12px;font-family:var(--font-sans);font-size:11px;color:var(--muted);margin-top:4px;">
-                  <span><%= sub.language.toUpperCase() %></span>
-                  <span><%= new Date(sub.createdAt).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }) %></span>
+                  <span translate="no"><%= String(sub.language || 'en').toUpperCase() %></span>
+                  <time datetime="<%= new Date(sub.createdAt).toISOString() %>" data-i18n-date="short"><%= formatDate(sub.createdAt, { year: 'numeric', month: 'short', day: 'numeric' }) %></time>
                 </div>
               </div>
               <div style="flex-shrink:0;">
-                <button class="btn danger unsubscribe-btn" type="button" data-i18n="unsubscribe"
-                  data-sub-id="<%= sub.id %>"
-                  data-sub-email="<%= sub.email %>"
+                <button class="btn danger" type="button" data-i18n="unsubscribe"
+                  data-confirm-url="/admin/subscribers/<%= encodeURIComponent(sub.id) %>/delete"
+                  data-confirm-key="removeSubscriberConfirm"
+                  data-confirm-action="confirm"
+                  data-var-email="<%= sub.email %>"
+                  data-confirm-redirect="/admin/subscribers"
                 >Unsubscribe</button>
               </div>
             </div>
@@ -71,133 +45,9 @@
       </section>
     </main>
 
-    <!-- Unsubscribe Confirmation Modal -->
-    <div class="modal-overlay" id="unsubConfirmModal">
-      <div class="modal-box">
-        <p class="modal-message" id="unsubConfirmMessage">Are you sure you want to remove this subscriber?</p>
-        <div class="modal-actions">
-          <button class="btn" type="button" id="cancelUnsubBtn" data-i18n="cancel">Cancel</button>
-          <button class="btn danger" type="button" id="confirmUnsubBtn" data-i18n="confirm">Confirm</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- Password Confirmation Modal -->
-    <div class="modal-overlay" id="passwordModal">
-      <div class="modal-box">
-        <p class="modal-message" data-i18n="enterAdminPassword">Please enter administrative password</p>
-        <input type="password" class="form-input" id="adminPasswordInput" autocomplete="off" />
-        <p class="modal-error" id="passwordError" data-i18n="incorrectPassword">Incorrect password.</p>
-        <div class="modal-actions">
-          <button class="btn" type="button" id="cancelPasswordBtn" data-i18n="cancel">Cancel</button>
-          <button class="btn danger" type="button" id="confirmPasswordBtn" data-i18n="confirm">Confirm</button>
-        </div>
-      </div>
-    </div>
-
-    <script>
-      (function() {
-        var unsubId = null;
-        var unsubEmail = null;
-        var csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
-
-        var unsubConfirmModal = document.getElementById('unsubConfirmModal');
-        var passwordModal = document.getElementById('passwordModal');
-        var unsubConfirmMessage = document.getElementById('unsubConfirmMessage');
-        var passwordInput = document.getElementById('adminPasswordInput');
-        var passwordError = document.getElementById('passwordError');
-        var confirmPasswordBtn = document.getElementById('confirmPasswordBtn');
-
-        // Attach click handlers to all unsubscribe buttons
-        document.querySelectorAll('.unsubscribe-btn').forEach(function(btn) {
-          btn.addEventListener('click', function() {
-            unsubId = btn.getAttribute('data-sub-id');
-            unsubEmail = btn.getAttribute('data-sub-email');
-            unsubConfirmMessage.textContent = 'Are you sure you want to remove ' + unsubEmail + ' from subscribers?';
-            unsubConfirmModal.classList.add('active');
-          });
-        });
-
-        // First modal: Cancel
-        document.getElementById('cancelUnsubBtn').addEventListener('click', function() {
-          unsubConfirmModal.classList.remove('active');
-          unsubId = null;
-          unsubEmail = null;
-        });
-
-        // First modal: Confirm → open password modal
-        document.getElementById('confirmUnsubBtn').addEventListener('click', function() {
-          unsubConfirmModal.classList.remove('active');
-          passwordInput.value = '';
-          passwordError.style.display = 'none';
-          passwordModal.classList.add('active');
-          passwordInput.focus();
-        });
-
-        // Second modal: Cancel
-        document.getElementById('cancelPasswordBtn').addEventListener('click', function() {
-          passwordModal.classList.remove('active');
-          unsubId = null;
-          unsubEmail = null;
-        });
-
-        // Second modal: Confirm with password
-        function submitPassword() {
-          var password = passwordInput.value;
-          if (!password) {
-            passwordError.style.display = 'block';
-            return;
-          }
-          confirmPasswordBtn.disabled = true;
-          confirmPasswordBtn.textContent = '...';
-
-          fetch('/admin/subscribers/' + encodeURIComponent(unsubId) + '/delete', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'x-csrf-token': csrfToken
-            },
-            body: JSON.stringify({ password: password })
-          }).then(function(res) {
-            return res.json();
-          }).then(function(data) {
-            if (data.success) {
-              window.location.href = '/admin/subscribers';
-            } else {
-              passwordError.style.display = 'block';
-              confirmPasswordBtn.disabled = false;
-              confirmPasswordBtn.textContent = 'Confirm';
-            }
-          }).catch(function() {
-            passwordError.style.display = 'block';
-            confirmPasswordBtn.disabled = false;
-            confirmPasswordBtn.textContent = 'Confirm';
-          });
-        }
-
-        confirmPasswordBtn.addEventListener('click', submitPassword);
-        passwordInput.addEventListener('keydown', function(e) {
-          if (e.key === 'Enter') submitPassword();
-        });
-
-        // Close modals when clicking the overlay background
-        unsubConfirmModal.addEventListener('click', function(e) {
-          if (e.target === unsubConfirmModal) {
-            unsubConfirmModal.classList.remove('active');
-            unsubId = null;
-            unsubEmail = null;
-          }
-        });
-        passwordModal.addEventListener('click', function(e) {
-          if (e.target === passwordModal) {
-            passwordModal.classList.remove('active');
-            unsubId = null;
-            unsubEmail = null;
-          }
-        });
-      })();
-    </script>
+    <%- include("../partials/admin-confirm-modals") %>
 
     <script src="/public/js/i18n.js"></script>
+    <script src="/public/js/admin-confirm.js"></script>
   </body>
 </html>

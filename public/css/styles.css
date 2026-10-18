@@ -1,8 +1,10 @@
 /* ===== The Augustine Journal — Global Stylesheet ===== */
 
 :root {
+  color-scheme: dark;
   --bg: #0a0a0e;
   --bg2: #111116;
+  --surface: #18181f;
   --card: rgba(255, 255, 255, 0.025);
   --card-border: rgba(255, 255, 255, 0.06);
   --card-shadow: 0 2px 12px rgba(0, 0, 0, 0.35), 0 1px 3px rgba(0, 0, 0, 0.2);
@@ -14,6 +16,8 @@
   --purple-soft: rgba(91, 45, 142, 0.07);
   --purple-border: rgba(91, 45, 142, 0.2);
   --purple-glow: rgba(91, 45, 142, 0.04);
+  --accent: #a88bd4;
+  --focus-ring: #a88bd4;
   --radius: 8px;
   --radius-lg: 12px;
   --font-serif: "Cormorant Garamond", Georgia, "Times New Roman", Times, serif;
@@ -60,11 +64,37 @@ a:hover { text-decoration: underline; }
 img { max-width: 100%; height: auto; }
 button, input, select, textarea { font: inherit; color: inherit; }
 
-/* ===== Google Translate Overrides ===== */
-.goog-te-banner-frame { display: none !important; }
-.skiptranslate { display: none !important; }
-body { top: 0 !important; }
-#google_translate_element { position: absolute; left: -9999px; opacity: 0; pointer-events: none; }
+/* ===== Translation (self-hosted engine) ===== */
+/* While a page is being translated, <html> carries .i18n-pending. Text that is
+   about to be replaced is hidden with visibility (never display:none) so the
+   layout does not reflow when the translation lands. If the class is somehow
+   never removed, the reveal animation shows the original text after a delay. */
+html.i18n-pending [data-translate-key],
+html.i18n-pending [data-i18n] {
+  visibility: hidden;
+  animation: i18n-reveal 0s linear var(--i18n-reveal-after, 10s) forwards;
+}
+
+@keyframes i18n-reveal {
+  to { visibility: visible; }
+}
+
+/* A long post translated progressively: gentle pulse on the part in progress */
+.i18n-translating {
+  animation: i18n-pulse 1.8s ease-in-out infinite;
+}
+
+@keyframes i18n-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .i18n-translating {
+    animation: none;
+    opacity: 0.7;
+  }
+}
 
 /* ===== Layout ===== */
 .container {
@@ -202,6 +232,7 @@ main.container {
   line-height: 1.45;
   text-align: center;
   letter-spacing: 0.15px;
+  overflow-wrap: break-word;
 }
 
 .notice + .notice {
@@ -222,6 +253,7 @@ main.container {
 .home-illustration svg {
   width: 100%;
   height: auto;
+  overflow: visible; /* the cross finial starts just above the viewBox */
 }
 
 /* ===== About ===== */
@@ -233,6 +265,7 @@ main.container {
   color: var(--text);
   max-width: 620px;
   margin: 0 auto;
+  overflow-wrap: break-word;
 }
 
 .about p {
@@ -266,6 +299,9 @@ main.container {
   font-size: 18px;
   font-weight: 500;
   transition: border-color 0.2s, background 0.2s, transform 0.15s;
+  max-width: 100%;
+  overflow-wrap: break-word;
+  overflow-wrap: anywhere;
 }
 
 .latest a:hover {
@@ -290,9 +326,11 @@ main.container {
   text-align: center;
   font-family: var(--font-serif);
   letter-spacing: 0.4px;
+  overflow-wrap: break-word;
 }
 
 .postRow {
+  position: relative;
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
@@ -302,6 +340,19 @@ main.container {
   border: 1px solid var(--border);
   background: rgba(0, 0, 0, 0.1);
   transition: border-color 0.2s, transform 0.15s;
+}
+
+/* The row's text column (post title, subscriber email) may hold long words */
+.postRow > div:first-child {
+  overflow-wrap: break-word;
+  overflow-wrap: anywhere;
+}
+
+/* When the title is just a link (public lists), the whole row is clickable */
+.postRow .title > a:only-child::after {
+  content: "";
+  position: absolute;
+  inset: 0;
 }
 
 .postRow:hover {
@@ -354,6 +405,7 @@ main.container {
   line-height: 1.25;
   letter-spacing: 0.3px;
   color: var(--text);
+  overflow-wrap: break-word;
 }
 
 .postMeta {
@@ -365,7 +417,7 @@ main.container {
   font-family: var(--font-sans);
   font-size: 12px;
   font-weight: 400;
-  color: rgba(138, 138, 153, 0.75);
+  color: var(--muted);
   letter-spacing: 0.4px;
 }
 
@@ -374,7 +426,7 @@ main.container {
   letter-spacing: 0.8px;
   font-size: 11px;
   font-weight: 500;
-  color: rgba(168, 139, 212, 0.65);
+  color: var(--accent);
 }
 
 .postMetaSep {
@@ -406,24 +458,23 @@ main.container {
   font-family: var(--font-serif);
   color: rgba(232, 232, 237, 0.92);
   text-align: left;
+  overflow-wrap: break-word; /* long reference URLs wrap instead of widening the page */
 }
 
 .postContent p {
   margin: 0 0 22px 0;
 }
 
+/* PDF-extracted markup. These match with or without the .pdf-text wrapper,
+   and come before the Quill alignment classes so editor alignment still wins. */
+
 /* First-line indent for PDF-extracted paragraphs */
-.postContent .pdf-text p.pdf-indent {
+.postContent .pdf-indent {
   text-indent: 2em;
 }
 
-/* ── PDF body: clean left-aligned prose, no extra headings ── */
-.postContent .pdf-text > p:not(.pdf-ref-entry) {
-  text-align: left;
-}
-
 /* ── References heading — centered, elegant, the only heading from PDF ── */
-.postContent .pdf-text .pdf-ref-heading {
+.postContent .pdf-ref-heading {
   text-align: center;
   font-family: var(--font-serif);
   font-size: 22px;
@@ -436,7 +487,7 @@ main.container {
 }
 
 /* ── Reference entries — left-aligned with hanging indent ── */
-.postContent .pdf-text .pdf-ref-entry {
+.postContent .pdf-ref-entry {
   padding-left: 2.5em;
   text-indent: -2.5em;
   text-align: left;
@@ -459,13 +510,19 @@ main.container {
 .postContent .ql-indent-7 { padding-left: 21em; }
 .postContent .ql-indent-8 { padding-left: 24em; }
 
-/* ── Rich-text headings (non-PDF content) ── */
+/* ── Rich-text headings (non-PDF content), kept below the post title size ── */
 .postContent h1, .postContent h2, .postContent h3, .postContent h4 {
   margin: 32px 0 14px 0;
   font-weight: 500;
   font-family: var(--font-serif);
+  line-height: 1.35;
   text-align: left;
 }
+
+.postContent h1 { font-size: 1.4em; }
+.postContent h2 { font-size: 1.25em; }
+.postContent h3 { font-size: 1.12em; }
+.postContent h4 { font-size: 1em; }
 
 .postContent blockquote {
   margin: 24px 0;
@@ -482,8 +539,56 @@ main.container {
   padding-left: 28px;
 }
 
+/* Quill 1.x stores nested list items flat (<li class="ql-indent-N">) and
+   numbers them with counters, so markers are drawn here the same way the
+   editor draws them (a. b. for level 1, i. ii. for level 2, and so on). */
+.postContent li {
+  list-style: none;
+}
+
+.postContent li::before {
+  display: inline-block;
+  min-width: 1.2em;
+  margin-left: -1.5em;
+  margin-right: 0.3em;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.postContent ul > li::before { content: "\2022"; }
+
+.postContent ol { counter-reset: list-0; }
+.postContent ol > li {
+  counter-increment: list-0;
+  counter-reset: list-1 list-2 list-3 list-4 list-5 list-6 list-7 list-8;
+}
+.postContent ol > li::before { content: counter(list-0, decimal) ". "; }
+.postContent ol > li.ql-indent-1 { counter-increment: list-1; counter-reset: list-2 list-3 list-4 list-5 list-6 list-7 list-8; }
+.postContent ol > li.ql-indent-1::before { content: counter(list-1, lower-alpha) ". "; }
+.postContent ol > li.ql-indent-2 { counter-increment: list-2; counter-reset: list-3 list-4 list-5 list-6 list-7 list-8; }
+.postContent ol > li.ql-indent-2::before { content: counter(list-2, lower-roman) ". "; }
+.postContent ol > li.ql-indent-3 { counter-increment: list-3; counter-reset: list-4 list-5 list-6 list-7 list-8; }
+.postContent ol > li.ql-indent-3::before { content: counter(list-3, decimal) ". "; }
+.postContent ol > li.ql-indent-4 { counter-increment: list-4; counter-reset: list-5 list-6 list-7 list-8; }
+.postContent ol > li.ql-indent-4::before { content: counter(list-4, lower-alpha) ". "; }
+.postContent ol > li.ql-indent-5 { counter-increment: list-5; counter-reset: list-6 list-7 list-8; }
+.postContent ol > li.ql-indent-5::before { content: counter(list-5, lower-roman) ". "; }
+.postContent ol > li.ql-indent-6 { counter-increment: list-6; counter-reset: list-7 list-8; }
+.postContent ol > li.ql-indent-6::before { content: counter(list-6, decimal) ". "; }
+.postContent ol > li.ql-indent-7 { counter-increment: list-7; counter-reset: list-8; }
+.postContent ol > li.ql-indent-7::before { content: counter(list-7, lower-alpha) ". "; }
+.postContent ol > li.ql-indent-8 { counter-increment: list-8; counter-reset: none; }
+.postContent ol > li.ql-indent-8::before { content: counter(list-8, lower-roman) ". "; }
+
+/* Colors pasted from Word/Docs (black or white spans) would be unreadable on
+   the dark page; post text always uses the site colors. */
+.postContent span[style] {
+  color: inherit !important;
+  background-color: transparent !important;
+}
+
 .postContent a {
-  color: #a88bd4;
+  color: var(--accent);
   text-decoration: underline;
   text-underline-offset: 3px;
   text-decoration-color: rgba(168, 139, 212, 0.3);
@@ -498,6 +603,7 @@ main.container {
 .postContent pre {
   white-space: pre-wrap;
   word-break: break-word;
+  overflow-wrap: anywhere;
   padding: 16px;
   border-radius: var(--radius);
   border: 1px solid var(--border);
@@ -522,7 +628,9 @@ main.container {
   padding-top: 20px;
   border-top: 1px solid var(--border);
   display: flex;
+  flex-wrap: wrap; /* longer labels (pt, ru) must not push the row off-screen */
   align-items: center;
+  row-gap: 10px;
 }
 
 .pdf-link {
@@ -593,7 +701,7 @@ main.container {
   letter-spacing: 0.3px;
 }
 
-.subscribe-cta-btn {
+.btn.subscribe-cta-btn {
   padding: 8px 18px;
   font-size: 12px;
 }
@@ -625,9 +733,9 @@ main.container {
 }
 
 /* ===== Subscribe Modal ===== */
-.subscribe-modal-box {
+.modal-box.subscribe-modal-box {
   max-width: 400px;
-  background: #18181f;
+  background: var(--surface);
   border: 1px solid rgba(255, 255, 255, 0.1);
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6), 0 2px 8px rgba(0, 0, 0, 0.4);
 }
@@ -683,7 +791,7 @@ main.container {
 .footer {
   padding: 32px 0 40px;
   text-align: center;
-  color: rgba(138, 138, 153, 0.5);
+  color: var(--muted);
   font-size: 11px;
   font-family: var(--font-sans);
   font-weight: 400;
@@ -721,7 +829,7 @@ main.container {
 }
 
 .btn:focus-visible {
-  outline: 2px solid rgba(91, 45, 142, 0.3);
+  outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
 }
 
@@ -761,7 +869,7 @@ main.container {
   display: flex;
 }
 .modal-box {
-  background: var(--card);
+  background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: 28px 32px;
@@ -776,6 +884,7 @@ main.container {
   margin: 0 0 20px;
   white-space: pre-line;
   line-height: 1.6;
+  overflow-wrap: break-word;
 }
 .modal-post-name {
   font-family: var(--font-serif);
@@ -783,6 +892,7 @@ main.container {
   font-weight: 500;
   color: var(--text);
   margin: 0 0 8px;
+  overflow-wrap: break-word;
 }
 .modal-actions {
   display: flex;
@@ -824,7 +934,12 @@ main.container {
 }
 
 .form-input:focus {
-  border-color: rgba(91, 45, 142, 0.25);
+  border-color: var(--focus-ring);
+}
+
+.form-input:focus-visible {
+  outline: 1px solid var(--focus-ring);
+  outline-offset: 0;
 }
 
 .form-input::placeholder {
@@ -861,6 +976,15 @@ textarea.form-input {
   font-weight: 400;
   margin-top: 4px;
   opacity: 0.6;
+}
+
+/* Text fields at 16px or more on phones and touch tablets, so iOS Safari
+   does not zoom the page in when one is focused */
+@media (max-width: 768px), (hover: none) and (pointer: coarse) {
+  .form-input,
+  .ql-editor {
+    font-size: 16px;
+  }
 }
 
 /* ===== Admin Stats ===== */
@@ -900,6 +1024,7 @@ textarea.form-input {
   font-weight: 400;
   text-align: center;
   margin-bottom: 16px;
+  overflow-wrap: break-word;
 }
 
 .alert-error {
@@ -913,6 +1038,7 @@ textarea.form-input {
   font-weight: 400;
   text-align: center;
   margin-bottom: 16px;
+  overflow-wrap: break-word;
 }
 
 /* ===== Admin Nav ===== */
@@ -978,8 +1104,9 @@ a:focus-visible,
 button:focus-visible,
 input:focus-visible,
 select:focus-visible,
-textarea:focus-visible {
-  outline: 2px solid rgba(91, 45, 142, 0.25);
+textarea:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
 }
 
@@ -1049,7 +1176,19 @@ textarea:focus-visible {
     font-size: 17px;
   }
 
+  /* Quill indents: a smaller step so deep levels keep a readable column */
+  .postContent .ql-indent-1 { padding-left: 2em; }
+  .postContent .ql-indent-2 { padding-left: 4em; }
+  .postContent .ql-indent-3 { padding-left: 6em; }
+  .postContent .ql-indent-4 { padding-left: 8em; }
+  .postContent .ql-indent-5 { padding-left: 10em; }
+  .postContent .ql-indent-6 { padding-left: 12em; }
+  .postContent .ql-indent-7 { padding-left: 14em; }
+  .postContent .ql-indent-8 { padding-left: 16em; }
+
+  /* Scroll sideways inside the screen width instead of overhanging it */
   .admin-nav {
+    max-width: 100%;
     gap: 4px;
     font-size: 12px;
     flex-wrap: nowrap;
@@ -1117,8 +1256,130 @@ textarea:focus-visible {
     line-height: 1.9;
   }
 
+  .postContent .ql-indent-1 { padding-left: 1.25em; }
+  .postContent .ql-indent-2 { padding-left: 2.5em; }
+  .postContent .ql-indent-3 { padding-left: 3.75em; }
+  .postContent .ql-indent-4 { padding-left: 5em; }
+  .postContent .ql-indent-5 { padding-left: 6.25em; }
+  .postContent .ql-indent-6 { padding-left: 7.5em; }
+  .postContent .ql-indent-7 { padding-left: 8.75em; }
+  .postContent .ql-indent-8 { padding-left: 10em; }
+
+  /* The PDF link gets its own line, so no divider is left dangling */
+  .postFooter .pdf-link {
+    flex-basis: 100%;
+  }
+
+  .postFooter-divider:has(+ .pdf-link) {
+    display: none;
+  }
+
   .postMeta {
     flex-wrap: wrap;
     gap: 5px;
+  }
+}
+
+/* ===== Print ===== */
+@media print {
+  :root {
+    color-scheme: light;
+  }
+
+  /* Plain black on white; the grain overlay alone would add megabytes per page */
+  *, *::before, *::after {
+    color: #000 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    text-shadow: none !important;
+  }
+
+  html, body {
+    background: #fff !important;
+  }
+
+  body {
+    display: block;
+    min-height: 0;
+  }
+
+  body::before {
+    display: none;
+  }
+
+  /* Site chrome and controls */
+  .nav,
+  .hamburger,
+  .admin-nav,
+  .footer,
+  .postFooter,
+  .subscribe-cta,
+  .modal-overlay,
+  button {
+    display: none !important;
+  }
+
+  .topbar {
+    padding: 0 0 12px;
+    border-bottom-color: #999;
+  }
+
+  .container,
+  main.container {
+    max-width: none;
+    padding: 0;
+  }
+
+  .card,
+  .section,
+  .postShell {
+    margin: 16px 0;
+    padding: 0;
+    border: none;
+    max-width: none;
+  }
+
+  .postRule {
+    height: 0;
+    border-top: 1px solid #999;
+  }
+
+  .postContent {
+    font-size: 12pt;
+    line-height: 1.6;
+  }
+
+  .postContent a {
+    text-decoration: underline;
+  }
+
+  .postContent blockquote,
+  .postContent pre,
+  .postContent .pdf-ref-heading,
+  .notice {
+    border-color: #999;
+  }
+
+  .postContent h1, .postContent h2, .postContent h3, .postContent h4,
+  .postTitle,
+  .pdf-ref-heading {
+    break-after: avoid;
+  }
+
+  .postContent p {
+    orphans: 3;
+    widows: 3;
+  }
+
+  .postContent blockquote,
+  .postContent pre,
+  img {
+    break-inside: avoid;
+  }
+
+  /* Show hidden-for-translation text rather than print blanks */
+  html.i18n-pending [data-translate-key],
+  html.i18n-pending [data-i18n] {
+    visibility: visible;
   }
 }

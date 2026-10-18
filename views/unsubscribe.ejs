@@ -1,0 +1,111 @@
+<%
+  const TEXT = {
+    en: {
+      site: "The Augustine Journal",
+      doneTitle: "Unsubscribed",
+      done: "You have been unsubscribed from The Augustine Journal emails.",
+      confirmTitle: "Unsubscribe",
+      confirm: "Do you want to stop receiving emails from The Augustine Journal at this address?",
+      button: "Unsubscribe",
+      invalidTitle: "Link incomplete",
+      invalid: "This unsubscribe link is incomplete. Please use the link at the bottom of one of our emails."
+    },
+    es: {
+      site: "El Diario Agustiniano",
+      doneTitle: "Suscripción cancelada",
+      done: "Has cancelado tu suscripción a los correos del Diario Agustiniano.",
+      confirmTitle: "Cancelar suscripción",
+      confirm: "¿Quieres dejar de recibir correos del Diario Agustiniano en esta dirección?",
+      button: "Cancelar suscripción",
+      invalidTitle: "Enlace incompleto",
+      invalid: "Este enlace para cancelar la suscripción está incompleto. Usa el enlace que aparece al final de uno de nuestros correos."
+    },
+    pt: {
+      site: "O Diário Agostiniano",
+      doneTitle: "Inscrição cancelada",
+      done: "Sua inscrição nos e-mails do Diário Agostiniano foi cancelada.",
+      confirmTitle: "Cancelar inscrição",
+      confirm: "Você quer deixar de receber e-mails do Diário Agostiniano neste endereço?",
+      button: "Cancelar inscrição",
+      invalidTitle: "Link incompleto",
+      invalid: "Este link de cancelamento está incompleto. Use o link que aparece no final de um dos nossos e-mails."
+    },
+    fr: {
+      site: "Le Journal augustinien",
+      doneTitle: "Désabonnement confirmé",
+      done: "Vous ne recevrez plus les e-mails du Journal augustinien.",
+      confirmTitle: "Se désabonner",
+      confirm: "Voulez-vous ne plus recevoir les e-mails du Journal augustinien à cette adresse ?",
+      button: "Se désabonner",
+      invalidTitle: "Lien incomplet",
+      invalid: "Ce lien de désabonnement est incomplet. Veuillez utiliser le lien figurant en bas de l’un de nos e-mails."
+    },
+    de: {
+      site: "Das Augustinische Journal",
+      doneTitle: "Abgemeldet",
+      done: "Sie wurden von den E-Mails des Augustinischen Journals abgemeldet.",
+      confirmTitle: "Abmelden",
+      confirm: "Möchten Sie an diese Adresse keine E-Mails des Augustinischen Journals mehr erhalten?",
+      button: "Abmelden",
+      invalidTitle: "Link unvollständig",
+      invalid: "Dieser Abmeldelink ist unvollständig. Bitte verwenden Sie den Link am Ende einer unserer E-Mails."
+    },
+    ru: {
+      site: "Августинский журнал",
+      doneTitle: "Вы отписались",
+      done: "Вы отписались от рассылки «Августинского журнала».",
+      confirmTitle: "Отписаться",
+      confirm: "Вы больше не хотите получать письма «Августинского журнала» на этот адрес?",
+      button: "Отписаться",
+      invalidTitle: "Ссылка неполная",
+      invalid: "Эта ссылка для отписки неполная. Пожалуйста, воспользуйтесь ссылкой в конце одного из наших писем."
+    }
+  };
+  const t = TEXT[lang] || TEXT.en;
+  const heading = state === "done" ? t.doneTitle : state === "confirm" ? t.confirmTitle : t.invalidTitle;
+%><!DOCTYPE html>
+<html lang="<%= TEXT[lang] ? lang : 'en' %>">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="robots" content="noindex, nofollow"/>
+  <title><%= heading %> | <%= t.site %></title>
+  <link rel="icon" href="/public/icons/favicon.svg" type="image/svg+xml" />
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&family=Inter:wght@300;400;500&display=swap" rel="stylesheet"/>
+  <style>
+    :root { color-scheme: dark; }
+    body { margin:0; background:#0a0a0e; color:#e8e8ed; font-family:'Cormorant Garamond',Georgia,serif; display:flex; align-items:center; justify-content:center; min-height:100vh; padding:20px; box-sizing:border-box; }
+    .box { text-align:center; max-width:480px; }
+    h1 { font-size:28px; font-weight:500; margin:0 0 16px; }
+    p { font-size:17px; line-height:1.7; color:rgba(232,232,237,0.85); margin:0 0 24px; overflow-wrap:anywhere; }
+    .email { font-family:'Inter',sans-serif; font-size:14px; color:#e8e8ed; }
+    a, button { display:inline-block; padding:10px 20px; border-radius:8px; border:1px solid rgba(255,255,255,0.12); background:rgba(255,255,255,0.03); color:#e8e8ed; text-decoration:none; font-family:'Inter',sans-serif; font-size:13px; cursor:pointer; transition:border-color 0.2s, background 0.2s; margin:4px; }
+    a:hover, button:hover { border-color:rgba(168,139,212,0.45); background:rgba(91,45,142,0.12); }
+    a:focus-visible, button:focus-visible { outline:2px solid #a88bd4; outline-offset:2px; }
+    form { margin:0; }
+  </style>
+</head>
+<body>
+  <main class="box">
+    <h1><%= heading %></h1>
+    <% if (state === "done") { %>
+      <p><%= t.done %></p>
+      <a href="/"><%= t.site %></a>
+    <% } else if (state === "confirm") { %>
+      <p><%= t.confirm %><br/><span class="email"><%= email %></span></p>
+      <form method="POST" action="/api/unsubscribe/confirm">
+        <input type="hidden" name="email" value="<%= email %>"/>
+        <input type="hidden" name="lang" value="<%= TEXT[lang] ? lang : 'en' %>"/>
+        <input type="hidden" name="formToken" value="<%= formToken %>"/>
+        <button type="submit"><%= t.button %></button>
+        <a href="/"><%= t.site %></a>
+      </form>
+    <% } else { %>
+      <p><%= t.invalid %></p>
+      <a href="/"><%= t.site %></a>
+    <% } %>
+  </main>
+</body>
+</html>

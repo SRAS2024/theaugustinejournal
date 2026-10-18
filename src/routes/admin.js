@@ -3,17 +3,20 @@ import { Router } from "express";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
-import pdfParse from "pdf-parse";
+import rateLimit from "express-rate-limit";
 import slugify from "slugify";
 import { nanoid } from "nanoid";
 
 import { getPrisma } from "../lib/db.js";
 import { requireAdmin } from "../middleware/auth.js";
+import { verifyCsrf } from "../middleware/csrf.js";
 import { ensureUploadsDir, getUploadsDir } from "../lib/uploads.js";
 import { sanitizeRichHtml } from "../lib/sanitize.js";
+import { extractPdfHtml } from "../lib/pdf-text.js";
 import { isValidAdminUser, verifyAdminPassword } from "../lib/security.js";
 import { sendNewPostEmail, sendUnsubscribeConfirmationEmail } from "../lib/email-service.js";
 import { submitPost } from "../lib/indexnow.js";
+import { scheduleBackfill, translatePostTitle } from "../lib/translation/service.js";
 
 const router = Router();
 
@@ -23,26 +26,47 @@ const router = Router();
 
 ensureUploadsDir();
 
+const MAX_PDF_BYTES = 15 * 1024 * 1024;
+
 const storage = multer.diskStorage({
   destination(_req, _file, cb) {
     cb(null, getUploadsDir());
   },
   filename(_req, file, cb) {
-    const base = slugify(path.parse(file.originalname).name, { lower: true, strict: true });
-    cb(null, `${base}-${nanoid(8)}${path.extname(file.originalname).toLowerCase()}`);
+    const base = slugify(path.parse(file.originalname).name, { lower: true, strict: true }) || "document";
+    cb(null, `${base.slice(0, 80)}-${nanoid(8)}.pdf`);
   }
 });
 
 const upload = multer({
   storage,
-  limits: { fileSize: 15 * 1024 * 1024 },
+  limits: { fileSize: MAX_PDF_BYTES, fieldSize: 25 * 1024 * 1024, files: 1 },
   fileFilter(_req, file, cb) {
-    if (path.extname(file.originalname).toLowerCase() !== ".pdf") {
-      return cb(new Error("Only PDF uploads are allowed."));
+    const isPdfName = path.extname(file.originalname).toLowerCase() === ".pdf";
+    const isPdfType = ["application/pdf", "application/x-pdf", "application/octet-stream"].includes(file.mimetype);
+    if (!isPdfName || !isPdfType) {
+      const err = new Error("Only PDF uploads are allowed.");
+      err.code = "NOT_PDF";
+      return cb(err);
     }
     cb(null, true);
   }
 });
+
+/** Error code for an upload problem, as understood by public/js/admin.js. */
+function uploadErrorCode(err) {
+  if (err?.code === "NOT_PDF") return "not_pdf";
+  if (err?.code === "LIMIT_FILE_SIZE") return "too_large";
+  return "failed";
+}
+
+/** Run multer, turning its errors into req.uploadError instead of a 500. */
+function pdfUpload(req, res, next) {
+  upload.single("pdfFile")(req, res, (err) => {
+    if (err) req.uploadError = err;
+    next();
+  });
+}
 
 /* ------------------------------------------------------------------ */
 /*  Constants & helpers                                                */
@@ -51,124 +75,83 @@ const upload = multer({
 const ALLOWED_POST_TYPES = ["BLOG", "ESSAY", "LETTER"];
 const SCHEMA_NOT_READY = "Database schema is not ready yet. Please refresh in a moment.";
 
+const ERRORS = {
+  errChooseType: "Choose a post type.",
+  errTitleRequired: "Title is required.",
+  errInvalidDate: "Invalid date.",
+  errPdfRequired: "PDF file is required for PDF mode.",
+  errContentRequired: "Content is required in editor mode.",
+  pdfNotPdf: "Only PDF files can be uploaded.",
+  pdfTooLarge: "The PDF is larger than 15 MB.",
+  pdfExtractFailed: "Failed to extract PDF text. Please try again.",
+  errSaveFailed: "The post could not be saved. Please try again."
+};
+
 function isTableMissingError(err) {
   return err?.code === "P2021";
 }
 
-function escapeHtml(str) {
-  return String(str)
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#039;");
+function siteUrl() {
+  return (process.env.SITE_URL || "https://theaugustinejournal.com").replace(/\/+$/, "");
 }
 
 function makeSlug(title) {
-  const base = slugify(title, { lower: true, strict: true });
+  const base = slugify(title, { lower: true, strict: true }).slice(0, 120).replace(/-+$/, "");
   return base.length ? base : nanoid(10);
 }
 
-function pdfTextToHtml(rawText) {
-  if (!rawText || !rawText.trim()) {
-    return "<p>PDF uploaded, but no selectable text was found.</p>";
-  }
+const hasText = (html) => String(html || "").replace(/<[^>]+>/g, "").replace(/&nbsp;/g, " ").trim().length > 0;
 
-  /* ── Phase 1: aggressively strip page numbers & repeated headers/footers ── */
-  const rawLines = rawText.split("\n");
+// Body of a PDF post whose PDF has no selectable text (e.g. a scan): the
+// reader opens the original PDF from the post page.
+const PDF_ONLY_HTML = '<div class="pdf-text"><p>This post is available as a PDF.</p></div>';
 
-  const pageNumLine = [
-    /^\s*\d{1,4}\s*$/,                    // "5"
-    /^\s*[ivxlc]+\s*$/i,                  // "iv", "XII"
-    /^\s*[-–—]\s*\d{1,4}\s*[-–—]\s*$/,   // "- 5 -"
-    /^\s*page\s+\d{1,4}\s*$/i,            // "Page 5"
-    /^\s*\d{1,4}\s*of\s*\d{1,4}\s*$/i,   // "5 of 10"
-  ];
+function parsePostDate(raw) {
+  if (!raw) return new Date();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(raw)) return null;
+  const date = new Date(`${raw}T00:00:00.000Z`);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
 
-  // Count normalised short lines to find running headers/footers (threshold: 2)
-  const freq = {};
-  for (const l of rawLines) {
-    const t = l.trim();
-    if (!t || t.length > 120) continue;
-    const norm = t.replace(/^\d{1,4}\s+/, "").replace(/\s+\d{1,4}$/, "").trim();
-    if (norm) freq[norm] = (freq[norm] || 0) + 1;
-  }
-  const repeated = new Set(
-    Object.entries(freq).filter(([, c]) => c >= 2).map(([t]) => t)
-  );
+/** Form fields from the request, used to re-render the form after an error. */
+function formPost(req, existing) {
+  const body = req.body || {};
+  const autoTranslateRaw = body.autoTranslateTitle;
+  return {
+    ...(existing || {}),
+    type: String(body.type || existing?.type || ""),
+    title: String(body.title ?? existing?.title ?? ""),
+    postDate: String(body.postDate || "") || existing?.postDate || new Date(),
+    contentType: String(body.contentMode || "") === "PDF" ? "PDF" : "RICH",
+    contentHtml: String(body.contentHtml ?? existing?.contentHtml ?? ""),
+    pdfPath: String(body.pdfPath || "") || existing?.pdfPath || null,
+    autoTranslateTitle: Array.isArray(autoTranslateRaw) ? autoTranslateRaw.includes("true") : autoTranslateRaw === "true"
+  };
+}
 
-  const cleaned = rawLines.filter((l) => {
-    const t = l.trim();
-    if (!t) return true; // keep blank lines for paragraph splitting
-    if (pageNumLine.some((r) => r.test(t))) return false;
-    const norm = t.replace(/^\d{1,4}\s+/, "").replace(/\s+\d{1,4}$/, "").trim();
-    if (norm && repeated.has(norm)) return false;
-    return true;
+function renderForm(res, status, { mode, post, errorKey }) {
+  return res.status(status).render("admin/post-form", {
+    mode,
+    post,
+    error: errorKey ? ERRORS[errorKey] || errorKey : "",
+    errorKey: errorKey || ""
   });
+}
 
-  /* ── Phase 2: split into paragraph blocks ── */
-  const blocks = cleaned.join("\n").split(/\n\s*\n/)
-    .map((b) => b.trim()).filter(Boolean)
-    .filter((b) => !/^\d{1,4}$/.test(b) && !/^[ivxlc]+$/i.test(b));
-
-  /* ── Phase 3: convert blocks to HTML ── */
-  /*  NO headings, NO page numbers, NO repeated titles.
-   *  Only exception: References / Bibliography / Works Cited heading.       */
-  let inReferences = false;
-  const htmlParts = [];
-
-  // Skip the first block if it looks like a title (the post already has a
-  // title from the database, so repeating it inside the body is redundant).
-  let startIndex = 0;
-  if (blocks.length > 0) {
-    const first = blocks[0].split("\n").map((l) => l.trim()).join(" ").replace(/\s{2,}/g, " ");
-    const sentences = (first.match(/[.!?](?:\s|$)/g) || []).length;
-    if (sentences < 3 && first.length < 300) startIndex = 1;
-  }
-
-  for (let i = startIndex; i < blocks.length; i++) {
-    const block = blocks[i];
-    const lines = block.split("\n");
-    const joined = lines.map((l) => l.trim()).join(" ").replace(/\s{2,}/g, " ");
-
-    /* References / Bibliography / Works Cited heading — the ONLY heading kept */
-    if (/^(references|bibliography|works?\s*cited|sources)$/i.test(joined)) {
-      inReferences = true;
-      htmlParts.push(`<h3 class="pdf-ref-heading">References</h3>`);
-      continue;
-    }
-
-    /* Skip any block that looks like a standalone heading / section title
-       (ALL-CAPS, very short, or single-line with < 60 chars and no period) */
-    if (!inReferences && lines.length <= 2 && joined.length < 80) {
-      const isAllCaps = joined === joined.toUpperCase() && /[A-Z]{2,}/.test(joined);
-      const looksLikeHeading = !joined.includes(".") && joined.length < 60;
-      if (isAllCaps || looksLikeHeading) continue;
-    }
-
-    /* Reference entry */
-    if (inReferences) {
-      htmlParts.push(`<p class="pdf-ref-entry">${escapeHtml(joined)}</p>`);
-    } else {
-      /* Normal body paragraph — use first-line indent for continuation feel */
-      const indent = lines[0].match(/^(\s{3,})/)?.[1]?.length || 0;
-      const cls = indent ? ' class="pdf-indent"' : "";
-      htmlParts.push(`<p${cls}>${escapeHtml(joined)}</p>`);
-    }
-  }
-
-  return `<div class="pdf-text">${htmlParts.filter(Boolean).join("\n")}</div>`;
+function removeUploadedFile(file) {
+  if (!file?.path) return;
+  fs.promises.rm(file.path, { force: true }).catch(() => {});
 }
 
 function deletePdfFile(pdfPath) {
   if (!pdfPath) return;
   const fsPath = path.join(getUploadsDir(), path.basename(pdfPath));
-  if (fs.existsSync(fsPath)) fs.unlinkSync(fsPath);
+  fs.promises.rm(fsPath, { force: true }).catch(() => {});
 }
 
 async function savePdfToDb(filename, filePath) {
   const prisma = getPrisma();
-  const data = fs.readFileSync(filePath);
+  const data = await fs.promises.readFile(filePath);
   await prisma.pdfFile.upsert({
     where: { filename },
     update: { data, size: data.length },
@@ -185,35 +168,111 @@ async function savePdfToDb(filename, filePath) {
 async function deletePdfFromDb(pdfPath) {
   if (!pdfPath) return;
   const filename = path.basename(pdfPath);
-  const prisma = getPrisma();
+  await getPrisma().pdfFile.deleteMany({ where: { filename } });
+}
+
+/** Delete a PDF that no post references any more (database copy and disk cache). */
+async function discardPdf(pdfPath) {
+  if (!pdfPath) return;
   try {
-    await prisma.pdfFile.delete({ where: { filename } });
-  } catch {
-    // Record may not exist yet (uploaded before this feature was added)
+    const stillUsed = await getPrisma().post.count({ where: { pdfPath } });
+    if (stillUsed) return;
+    await deletePdfFromDb(pdfPath);
+    deletePdfFile(pdfPath);
+  } catch (err) {
+    console.error("[admin] Failed to remove old PDF:", err?.message || err);
   }
+}
+
+/** A PDF path previously returned by the extract endpoint (and stored in the database). */
+async function knownPdfPath(raw) {
+  const value = String(raw || "").trim();
+  const m = /^\/uploads\/([\w.-]+\.pdf)$/i.exec(value);
+  if (!m) return null;
+  const record = await getPrisma().pdfFile.findUnique({ where: { filename: m[1] }, select: { id: true } });
+  return record ? value : null;
+}
+
+/**
+ * Turn an uploaded PDF into post HTML and store it. Returns { html, pdfPath }
+ * or { errorKey } when the file is unusable.
+ */
+async function ingestPdf(file, title = "") {
+  try {
+    const buffer = await fs.promises.readFile(file.path);
+    const html = await extractPdfHtml(buffer, { title });
+    await savePdfToDb(file.filename, file.path);
+    return { html, pdfPath: `/uploads/${file.filename}` };
+  } catch (err) {
+    console.error("[admin] PDF processing failed:", err?.message || err);
+    removeUploadedFile(file);
+    return { errorKey: "pdfExtractFailed" };
+  }
+}
+
+function notifyNewPost(post) {
+  sendNewPostEmail(post, {
+    titleFor: (lang) => translatePostTitle(post, lang, { timeoutMs: 60_000 })
+  }).catch((err) => {
+    console.error("[admin] Failed to send new post email:", err?.message || err);
+  });
 }
 
 /* ------------------------------------------------------------------ */
 /*  Auth routes (no admin session required)                           */
 /* ------------------------------------------------------------------ */
 
-router.get("/login", (_req, res) => {
+/** Rate-limit key: the client IP, with IPv6 addresses grouped by /64 network. */
+function clientKey(req) {
+  const ip = String(req.ip || "");
+  if (!ip.includes(":") || ip.startsWith("::ffff:")) return ip;
+  const full = ip.split("::");
+  const head = full[0] ? full[0].split(":") : [];
+  const tail = full.length > 1 && full[1] ? full[1].split(":") : [];
+  const groups = [...head, ...Array(Math.max(0, 8 - head.length - tail.length)).fill("0"), ...tail];
+  return `${groups.slice(0, 4).join(":")}::/64`;
+}
+
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  keyGenerator: clientKey,
+  skipSuccessfulRequests: true,
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: (req, res) => {
+    res.status(429).render("admin/login", { error: "Too many sign-in attempts. Please wait a few minutes and try again.", errorKey: "tooManyAttempts" });
+  }
+});
+
+router.get("/login", (req, res) => {
+  if (req.session?.admin?.isLoggedIn) return res.redirect("/admin/dashboard");
   res.render("admin/login", { error: "" });
 });
 
-router.post("/login", async (req, res) => {
-  const username = String(req.body.username || "");
-  const password = String(req.body.password || "");
+router.post("/login", loginLimiter, verifyCsrf, async (req, res, next) => {
+  try {
+    const username = String(req.body.username || "");
+    const password = String(req.body.password || "");
 
-  if (!isValidAdminUser(username)) {
-    return res.status(401).render("admin/login", { error: "Invalid credentials." });
+    // Always check the password so both failures take the same time.
+    const [userOk, passwordOk] = [isValidAdminUser(username), await verifyAdminPassword(password)];
+    if (!userOk || !passwordOk) {
+      return res.status(401).render("admin/login", { error: "Invalid credentials.", errorKey: "invalidCredentials" });
+    }
+
+    // A fresh session ID on sign-in (prevents session fixation).
+    req.session.regenerate((err) => {
+      if (err) return next(err);
+      req.session.admin = { isLoggedIn: true, name: process.env.ADMIN_USERNAME };
+      req.session.save((saveErr) => {
+        if (saveErr) return next(saveErr);
+        res.redirect("/admin/welcome");
+      });
+    });
+  } catch (err) {
+    next(err);
   }
-
-  const ok = await verifyAdminPassword(password);
-  if (!ok) return res.status(401).render("admin/login", { error: "Invalid credentials." });
-
-  req.session.admin = { isLoggedIn: true, name: process.env.ADMIN_USERNAME };
-  res.redirect("/admin/welcome");
 });
 
 /* ------------------------------------------------------------------ */
@@ -222,9 +281,9 @@ router.post("/login", async (req, res) => {
 
 router.get("/", requireAdmin, (_req, res) => res.redirect("/admin/dashboard"));
 
-router.post("/logout", requireAdmin, (req, res) => {
+router.post("/logout", requireAdmin, verifyCsrf, (req, res) => {
   req.session.destroy(() => {
-    res.clearCookie("taj.sid");
+    res.clearCookie("taj.sid", { path: "/", httpOnly: true, sameSite: "lax", secure: process.env.NODE_ENV === "production" });
     res.redirect("/admin/login");
   });
 });
@@ -238,8 +297,7 @@ router.get("/welcome", requireAdmin, (_req, res) => {
 router.get("/dashboard", requireAdmin, async (req, res, next) => {
   try {
     const prisma = getPrisma();
-    const [settings, notices, postCount, blogCount, essayCount, letterCount, subscriberCount] = await Promise.all([
-      prisma.siteSettings.findUnique({ where: { id: 1 } }),
+    const [notices, postCount, blogCount, essayCount, letterCount, subscriberCount] = await Promise.all([
       prisma.notice.findMany({ orderBy: { order: "asc" }, take: 3 }),
       prisma.post.count(),
       prisma.post.count({ where: { type: "BLOG" } }),
@@ -248,7 +306,6 @@ router.get("/dashboard", requireAdmin, async (req, res, next) => {
       prisma.subscriber.count()
     ]);
     res.render("admin/dashboard", {
-      settings,
       notices,
       postCount,
       blogCount,
@@ -258,19 +315,7 @@ router.get("/dashboard", requireAdmin, async (req, res, next) => {
       saved: req.query.saved === "true"
     });
   } catch (err) {
-    if (isTableMissingError(err)) {
-      return res.render("admin/dashboard", {
-        settings: { id: 1, aboutHtml: "", updatedAt: new Date() },
-        notices: [],
-        postCount: 0,
-        blogCount: 0,
-        essayCount: 0,
-        letterCount: 0,
-        subscriberCount: 0,
-        saved: req.query.saved === "true",
-        error: ""
-      });
-    }
+    if (isTableMissingError(err)) return res.status(503).send(SCHEMA_NOT_READY);
     next(err);
   }
 });
@@ -291,19 +336,12 @@ router.get("/settings", requireAdmin, async (req, res, next) => {
       saved: req.query.saved === "true"
     });
   } catch (err) {
-    if (isTableMissingError(err)) {
-      return res.render("admin/edit-settings", {
-        settings: { id: 1, aboutHtml: "", updatedAt: new Date() },
-        notices: [],
-        error: "",
-        saved: req.query.saved === "true"
-      });
-    }
+    if (isTableMissingError(err)) return res.status(503).send(SCHEMA_NOT_READY);
     next(err);
   }
 });
 
-router.post("/settings", requireAdmin, async (req, res, next) => {
+router.post("/settings", requireAdmin, verifyCsrf, async (req, res, next) => {
   try {
     const prisma = getPrisma();
     const aboutHtml = sanitizeRichHtml(String(req.body.aboutHtml || ""));
@@ -312,6 +350,7 @@ router.post("/settings", requireAdmin, async (req, res, next) => {
       update: { aboutHtml },
       create: { id: 1, aboutHtml }
     });
+    scheduleBackfill();
     res.redirect("/admin/settings?saved=true");
   } catch (err) {
     if (isTableMissingError(err)) return res.status(503).send(SCHEMA_NOT_READY);
@@ -321,41 +360,56 @@ router.post("/settings", requireAdmin, async (req, res, next) => {
 
 /* ---------- Notices ---------- */
 
-router.post("/notices/add", requireAdmin, async (req, res, next) => {
+const noticeText = (req) => String(req.body.message || "").replace(/\s+/g, " ").trim().slice(0, 500);
+
+router.post("/notices/add", requireAdmin, verifyCsrf, async (req, res, next) => {
   try {
     const prisma = getPrisma();
-    const message = String(req.body.message || "").trim();
+    const message = noticeText(req);
     if (!message) return res.redirect("/admin/settings");
-    const count = await prisma.notice.count();
-    if (count >= 3) return res.redirect("/admin/settings");
-    await prisma.notice.create({ data: { id: nanoid(), message, order: count + 1 } });
-    res.redirect("/admin/settings?saved=true");
-  } catch (err) {
-    if (isTableMissingError(err)) return res.status(503).send(SCHEMA_NOT_READY);
-    next(err);
-  }
-});
-
-router.post("/notices/:id/update", requireAdmin, async (req, res, next) => {
-  try {
-    const prisma = getPrisma();
-    const message = String(req.body.message || "").trim();
-    await prisma.notice.update({ where: { id: req.params.id }, data: { message } });
-    res.redirect("/admin/settings?saved=true");
-  } catch (err) {
-    if (isTableMissingError(err)) return res.status(503).send(SCHEMA_NOT_READY);
-    next(err);
-  }
-});
-
-router.post("/notices/:id/delete", requireAdmin, async (req, res, next) => {
-  try {
-    const prisma = getPrisma();
-    await prisma.notice.delete({ where: { id: req.params.id } });
-    const notices = await prisma.notice.findMany({ orderBy: { order: "asc" } });
-    for (let i = 0; i < notices.length; i++) {
-      await prisma.notice.update({ where: { id: notices[i].id }, data: { order: i + 1 } });
+    let created = false;
+    try {
+      created = await prisma.$transaction(async (tx) => {
+        const count = await tx.notice.count();
+        if (count >= 3) return false;
+        await tx.notice.create({ data: { id: nanoid(), message, order: count + 1 } });
+        return true;
+      }, { isolationLevel: "Serializable" });
+    } catch (err) {
+      if (err?.code !== "P2034") throw err; // a simultaneous add won; keep the limit
     }
+    if (created) scheduleBackfill();
+    res.redirect(created ? "/admin/settings?saved=true" : "/admin/settings");
+  } catch (err) {
+    if (isTableMissingError(err)) return res.status(503).send(SCHEMA_NOT_READY);
+    next(err);
+  }
+});
+
+router.post("/notices/:id/update", requireAdmin, verifyCsrf, async (req, res, next) => {
+  try {
+    const prisma = getPrisma();
+    const message = noticeText(req);
+    if (!message) return res.redirect("/admin/settings");
+    const { count } = await prisma.notice.updateMany({ where: { id: req.params.id }, data: { message } });
+    if (count) scheduleBackfill();
+    res.redirect("/admin/settings?saved=true");
+  } catch (err) {
+    if (isTableMissingError(err)) return res.status(503).send(SCHEMA_NOT_READY);
+    next(err);
+  }
+});
+
+router.post("/notices/:id/delete", requireAdmin, verifyCsrf, async (req, res, next) => {
+  try {
+    const prisma = getPrisma();
+    await prisma.$transaction(async (tx) => {
+      await tx.notice.deleteMany({ where: { id: req.params.id } });
+      const notices = await tx.notice.findMany({ orderBy: { order: "asc" } });
+      for (let i = 0; i < notices.length; i++) {
+        await tx.notice.update({ where: { id: notices[i].id }, data: { order: i + 1 } });
+      }
+    });
     res.redirect("/admin/settings?saved=true");
   } catch (err) {
     if (isTableMissingError(err)) return res.status(503).send(SCHEMA_NOT_READY);
@@ -373,18 +427,16 @@ router.get("/subscribers", requireAdmin, async (req, res, next) => {
     });
     res.render("admin/subscribers", { subscribers });
   } catch (err) {
-    if (isTableMissingError(err)) {
-      return res.render("admin/subscribers", { subscribers: [] });
-    }
+    if (isTableMissingError(err)) return res.status(503).send(SCHEMA_NOT_READY);
     next(err);
   }
 });
 
 /* ---------- Subscriber delete (admin unsubscribe) ---------- */
 
-router.post("/subscribers/:id/delete", requireAdmin, async (req, res, next) => {
+router.post("/subscribers/:id/delete", requireAdmin, verifyCsrf, async (req, res, next) => {
   try {
-    const { password } = req.body;
+    const password = String(req.body?.password || "");
     if (!password || !(await verifyAdminPassword(password))) {
       return res.status(401).json({ success: false, error: "Incorrect password." });
     }
@@ -392,7 +444,7 @@ router.post("/subscribers/:id/delete", requireAdmin, async (req, res, next) => {
     const prisma = getPrisma();
     const subscriber = await prisma.subscriber.findUnique({ where: { id: req.params.id } });
     if (!subscriber) return res.status(404).json({ success: false, error: "Subscriber not found." });
-    await prisma.subscriber.delete({ where: { id: req.params.id } });
+    await prisma.subscriber.deleteMany({ where: { id: req.params.id } });
 
     // Send unsubscribe confirmation email (fire-and-forget)
     sendUnsubscribeConfirmationEmail({ email: subscriber.email, language: subscriber.language }).catch(err => {
@@ -401,7 +453,7 @@ router.post("/subscribers/:id/delete", requireAdmin, async (req, res, next) => {
 
     res.json({ success: true });
   } catch (err) {
-    if (isTableMissingError(err)) return res.status(503).send(SCHEMA_NOT_READY);
+    if (isTableMissingError(err)) return res.status(503).json({ success: false, error: SCHEMA_NOT_READY });
     next(err);
   }
 });
@@ -415,41 +467,32 @@ router.get("/posts", requireAdmin, async (req, res, next) => {
     const where = ALLOWED_POST_TYPES.includes(type) ? { type } : undefined;
     const posts = await prisma.post.findMany({
       where,
-      orderBy: [{ postDate: "desc" }, { createdAt: "desc" }]
+      orderBy: [{ postDate: "desc" }, { createdAt: "desc" }],
+      select: { id: true, slug: true, title: true, type: true, postDate: true, contentType: true, viewCount: true, shareCount: true }
     });
-    res.render("admin/posts", { posts, filter: type, saved: req.query.saved === "true" });
+    res.render("admin/posts", { posts, filter: ALLOWED_POST_TYPES.includes(type) ? type : "ALL", saved: req.query.saved === "true" });
   } catch (err) {
-    if (isTableMissingError(err)) {
-      return res.render("admin/posts", {
-        posts: [],
-        filter: String(req.query.type || "ALL"),
-        saved: req.query.saved === "true"
-      });
-    }
+    if (isTableMissingError(err)) return res.status(503).send(SCHEMA_NOT_READY);
     next(err);
   }
 });
 
 /* ---------- PDF text extraction (AJAX) ---------- */
 
-router.post("/posts/extract-pdf", requireAdmin, upload.single("pdfFile"), async (req, res) => {
-  try {
-    if (!req.file) {
-      return res.status(400).json({ error: "No PDF file provided." });
-    }
-    const fileFullPath = path.join(getUploadsDir(), req.file.filename);
-    const dataBuffer = fs.readFileSync(fileFullPath);
-    const parsed = await pdfParse(dataBuffer);
-    const html = pdfTextToHtml((parsed.text || "").trim());
-
-    // Persist PDF binary in the database so it survives redeployments
-    await savePdfToDb(req.file.filename, fileFullPath);
-
-    res.json({ html, filename: req.file.filename, pdfPath: `/uploads/${req.file.filename}` });
-  } catch (err) {
-    console.error("[extract-pdf]", err);
-    res.status(500).json({ error: "Failed to extract PDF text." });
+router.post("/posts/extract-pdf", requireAdmin, pdfUpload, verifyCsrf, async (req, res) => {
+  if (req.uploadError) {
+    removeUploadedFile(req.file);
+    return res.status(400).json({ error: req.uploadError.message, code: uploadErrorCode(req.uploadError) });
   }
+  if (!req.file) {
+    return res.status(400).json({ error: "No PDF file provided.", code: "no_file" });
+  }
+  const result = await ingestPdf(req.file, String(req.body?.title || ""));
+  if (result.errorKey) return res.status(422).json({ error: ERRORS[result.errorKey], code: "failed" });
+  if (!hasText(result.html)) {
+    return res.json({ html: "", code: "no_text", filename: req.file.filename, pdfPath: result.pdfPath });
+  }
+  res.json({ html: result.html, filename: req.file.filename, pdfPath: result.pdfPath });
 });
 
 /* ---------- Post create ---------- */
@@ -457,97 +500,77 @@ router.post("/posts/extract-pdf", requireAdmin, upload.single("pdfFile"), async 
 router.get("/posts/new", requireAdmin, (_req, res) => {
   res.render("admin/post-form", {
     mode: "create",
-    post: { type: "BLOG", postDate: new Date().toISOString().slice(0, 10), autoTranslateTitle: true },
-    error: ""
+    post: { type: "", postDate: new Date().toISOString().slice(0, 10), autoTranslateTitle: true, contentType: "RICH" },
+    error: "",
+    errorKey: ""
   });
 });
 
-router.post("/posts/create", requireAdmin, upload.single("pdfFile"), async (req, res, next) => {
+router.post("/posts/create", requireAdmin, pdfUpload, verifyCsrf, async (req, res) => {
+  const fail = (status, errorKey) => {
+    removeUploadedFile(req.file);
+    return renderForm(res, status, { mode: "create", post: formPost(req), errorKey });
+  };
   try {
+    if (req.uploadError) return fail(400, uploadErrorCode(req.uploadError) === "too_large" ? "pdfTooLarge" : "pdfNotPdf");
+
     const prisma = getPrisma();
     const type = String(req.body.type || "").trim();
     const title = String(req.body.title || "").trim();
-    const postDateRaw = String(req.body.postDate || "").trim();
     const contentMode = String(req.body.contentMode || "RICH");
-    const autoTranslateRaw = req.body.autoTranslateTitle;
-    const autoTranslateTitle = Array.isArray(autoTranslateRaw)
-      ? autoTranslateRaw.includes("true")
-      : autoTranslateRaw === "true";
+    const autoTranslateTitle = formPost(req).autoTranslateTitle;
 
-    if (!type || !ALLOWED_POST_TYPES.includes(type)) {
-      return res.status(400).render("admin/post-form", { mode: "create", post: null, error: "Choose a post type." });
-    }
-    if (!title) {
-      return res.status(400).render("admin/post-form", { mode: "create", post: null, error: "Title is required." });
-    }
-
-    const postDate = postDateRaw ? new Date(postDateRaw) : new Date();
-    if (Number.isNaN(postDate.getTime())) {
-      return res.status(400).render("admin/post-form", { mode: "create", post: null, error: "Invalid date." });
-    }
+    if (!ALLOWED_POST_TYPES.includes(type)) return fail(400, "errChooseType");
+    if (!title) return fail(400, "errTitleRequired");
+    const postDate = parsePostDate(String(req.body.postDate || "").trim());
+    if (!postDate) return fail(400, "errInvalidDate");
 
     let contentType = "RICH";
     let contentHtml = "";
     let pdfPath = null;
 
     if (contentMode === "PDF") {
-      // Check for pre-extracted PDF path (from AJAX extraction workflow)
-      const existingPdfPath = String(req.body.pdfPath || "").trim();
       const editedHtml = sanitizeRichHtml(String(req.body.contentHtml || ""));
-
+      contentType = "PDF";
       if (req.file) {
-        // New file uploaded via form (fallback path)
-        const fileFullPath = path.join(getUploadsDir(), req.file.filename);
-        const dataBuffer = fs.readFileSync(fileFullPath);
-        const parsed = await pdfParse(dataBuffer);
-        contentType = "PDF";
-        contentHtml = editedHtml && editedHtml.replace(/<[^>]+>/g, "").trim().length
-          ? editedHtml
-          : pdfTextToHtml((parsed.text || "").trim());
-        pdfPath = `/uploads/${req.file.filename}`;
-        // Persist PDF binary in the database so it survives redeployments
-        await savePdfToDb(req.file.filename, fileFullPath);
-      } else if (existingPdfPath && editedHtml.replace(/<[^>]+>/g, "").trim().length) {
-        // PDF was already uploaded via AJAX; admin edited the extracted text
-        contentType = "PDF";
-        contentHtml = editedHtml;
-        pdfPath = existingPdfPath;
+        // New file uploaded with the form (fallback when the AJAX extraction was not used)
+        const result = await ingestPdf(req.file, title);
+        if (result.errorKey) return fail(422, result.errorKey);
+        contentHtml = hasText(editedHtml) ? editedHtml : sanitizeRichHtml(result.html);
+        pdfPath = result.pdfPath;
       } else {
-        return res.status(400).render("admin/post-form", {
-          mode: "create", post: null, error: "PDF file is required for PDF mode."
-        });
+        // PDF was already uploaded via AJAX; the admin edited the extracted text
+        pdfPath = await knownPdfPath(req.body.pdfPath);
+        contentHtml = editedHtml;
       }
+      if (!pdfPath) return fail(400, "errPdfRequired");
+      if (!hasText(contentHtml)) contentHtml = PDF_ONLY_HTML;
     } else {
-      const richHtml = sanitizeRichHtml(String(req.body.contentHtml || ""));
-      if (!richHtml.replace(/<[^>]+>/g, "").trim().length) {
-        return res.status(400).render("admin/post-form", {
-          mode: "create", post: null, error: "Content is required in editor mode."
-        });
-      }
-      contentHtml = richHtml;
+      contentHtml = sanitizeRichHtml(String(req.body.contentHtml || ""));
+      if (!hasText(contentHtml)) return fail(400, "errContentRequired");
     }
 
     let slug = makeSlug(title);
-    const collision = await prisma.post.findUnique({ where: { slug } });
-    if (collision) slug = `${slug}-${nanoid(6)}`;
+    const [collision, redirect] = await Promise.all([
+      prisma.post.findUnique({ where: { slug } }),
+      prisma.postRedirect.findUnique({ where: { slug } })
+    ]);
+    if (collision || redirect) slug = `${slug}-${nanoid(6)}`;
 
     const newPost = await prisma.post.create({
       data: { id: nanoid(), slug, type, title, postDate, contentType, contentHtml, pdfPath, autoTranslateTitle }
     });
 
-    // Fire-and-forget: send new post notification email
-    sendNewPostEmail(newPost).catch(err => {
-      console.error("[admin] Failed to send new post email:", err?.message || err);
-    });
-
-    // Fire-and-forget: notify search engines so the new post gets crawled promptly
+    // Prepare translations, e-mail subscribers and notify search engines (all in the background).
+    scheduleBackfill(1000);
+    notifyNewPost(newPost);
     submitPost(newPost).catch(() => {});
 
     res.redirect("/admin/posts?saved=true");
   } catch (err) {
     if (isTableMissingError(err)) return res.status(503).send(SCHEMA_NOT_READY);
     console.error(err);
-    res.status(500).send("Failed to create post.");
+    return fail(500, "errSaveFailed");
   }
 });
 
@@ -557,41 +580,43 @@ router.get("/posts/:id/edit", requireAdmin, async (req, res, next) => {
   try {
     const prisma = getPrisma();
     const post = await prisma.post.findUnique({ where: { id: req.params.id } });
-    if (!post) return res.status(404).send("Not found.");
-    res.render("admin/post-form", { mode: "edit", post, error: "" });
+    if (!post) return res.status(404).render("not-found", { title: "Page not found | The Augustine Journal", active: "" });
+    res.render("admin/post-form", { mode: "edit", post, error: "", errorKey: "" });
   } catch (err) {
     if (isTableMissingError(err)) return res.status(503).send(SCHEMA_NOT_READY);
     next(err);
   }
 });
 
-router.post("/posts/:id/update", requireAdmin, upload.single("pdfFile"), async (req, res, next) => {
+router.post("/posts/:id/update", requireAdmin, pdfUpload, verifyCsrf, async (req, res) => {
+  let existing = null;
+  let ingestedPdfPath = null; // a PDF sent with this request and stored
+  const fail = async (status, errorKey) => {
+    removeUploadedFile(req.file);
+    // A PDF uploaded earlier through the extraction step stays: the re-shown
+    // form still points at it (unused uploads are cleaned up after a day).
+    if (ingestedPdfPath) await discardPdf(ingestedPdfPath);
+    return renderForm(res, status, { mode: "edit", post: formPost(req, existing), errorKey });
+  };
   try {
     const prisma = getPrisma();
     const id = req.params.id;
-    const existing = await prisma.post.findUnique({ where: { id } });
-    if (!existing) return res.status(404).send("Not found.");
+    existing = await prisma.post.findUnique({ where: { id } });
+    if (!existing) {
+      removeUploadedFile(req.file);
+      return res.status(404).render("not-found", { title: "Page not found | The Augustine Journal", active: "" });
+    }
+    if (req.uploadError) return fail(400, uploadErrorCode(req.uploadError) === "too_large" ? "pdfTooLarge" : "pdfNotPdf");
 
     const type = String(req.body.type || "").trim();
     const title = String(req.body.title || "").trim();
-    const postDateRaw = String(req.body.postDate || "").trim();
     const contentMode = String(req.body.contentMode || (existing.contentType === "PDF" ? "PDF" : "RICH"));
-    const autoTranslateRaw = req.body.autoTranslateTitle;
-    const autoTranslateTitle = Array.isArray(autoTranslateRaw)
-      ? autoTranslateRaw.includes("true")
-      : autoTranslateRaw === "true";
+    const autoTranslateTitle = formPost(req, existing).autoTranslateTitle;
 
-    if (!type || !ALLOWED_POST_TYPES.includes(type)) {
-      return res.status(400).render("admin/post-form", { mode: "edit", post: existing, error: "Choose a post type." });
-    }
-    if (!title) {
-      return res.status(400).render("admin/post-form", { mode: "edit", post: existing, error: "Title is required." });
-    }
-
-    const postDate = postDateRaw ? new Date(postDateRaw) : new Date();
-    if (Number.isNaN(postDate.getTime())) {
-      return res.status(400).render("admin/post-form", { mode: "edit", post: existing, error: "Invalid date." });
-    }
+    if (!ALLOWED_POST_TYPES.includes(type)) return fail(400, "errChooseType");
+    if (!title) return fail(400, "errTitleRequired");
+    const postDate = parsePostDate(String(req.body.postDate || "").trim());
+    if (!postDate) return fail(400, "errInvalidDate");
 
     let contentType = existing.contentType;
     let contentHtml = existing.contentHtml;
@@ -600,76 +625,90 @@ router.post("/posts/:id/update", requireAdmin, upload.single("pdfFile"), async (
     if (contentMode === "PDF") {
       contentType = "PDF";
       const editedHtml = sanitizeRichHtml(String(req.body.contentHtml || ""));
-      const newPdfPath = String(req.body.pdfPath || "").trim();
+      const submittedPdfPath = String(req.body.pdfPath || "").trim();
 
       if (req.file) {
-        await deletePdfFromDb(existing.pdfPath);
-        deletePdfFile(existing.pdfPath);
-        const fileFullPath = path.join(getUploadsDir(), req.file.filename);
-        const dataBuffer = fs.readFileSync(fileFullPath);
-        const parsed = await pdfParse(dataBuffer);
-        contentHtml = editedHtml && editedHtml.replace(/<[^>]+>/g, "").trim().length
-          ? editedHtml
-          : pdfTextToHtml((parsed.text || "").trim());
-        pdfPath = `/uploads/${req.file.filename}`;
-        // Persist PDF binary in the database so it survives redeployments
-        await savePdfToDb(req.file.filename, fileFullPath);
-      } else if (newPdfPath) {
-        // PDF uploaded via AJAX, previous PDF replaced
-        if (newPdfPath !== existing.pdfPath) {
-          await deletePdfFromDb(existing.pdfPath);
-          deletePdfFile(existing.pdfPath);
-        }
-        pdfPath = newPdfPath;
-        if (editedHtml.replace(/<[^>]+>/g, "").trim().length) {
-          contentHtml = editedHtml;
-        }
-      } else if (editedHtml.replace(/<[^>]+>/g, "").trim().length) {
-        // No new file, but admin edited existing content
+        // New PDF sent with the form: process and store it before touching the post.
+        const result = await ingestPdf(req.file, title);
+        if (result.errorKey) return fail(422, result.errorKey);
+        ingestedPdfPath = result.pdfPath;
+        pdfPath = result.pdfPath;
+        contentHtml = hasText(editedHtml) ? editedHtml : sanitizeRichHtml(result.html);
+      } else if (submittedPdfPath && submittedPdfPath !== existing.pdfPath) {
+        // Replaced via the AJAX extraction
+        pdfPath = await knownPdfPath(submittedPdfPath);
+        if (!pdfPath) return fail(400, "errPdfRequired");
+        contentHtml = hasText(editedHtml) ? editedHtml : "";
+      } else if (hasText(editedHtml)) {
+        // No new file, but the admin edited the existing content
         contentHtml = editedHtml;
       }
+      if (!pdfPath) return fail(400, "errPdfRequired");
+      if (!hasText(contentHtml)) contentHtml = PDF_ONLY_HTML;
     } else {
       contentType = "RICH";
       const richHtml = sanitizeRichHtml(String(req.body.contentHtml || ""));
-      if (!richHtml.replace(/<[^>]+>/g, "").trim().length) {
-        return res.status(400).render("admin/post-form", {
-          mode: "edit", post: existing, error: "Content is required in editor mode."
-        });
-      }
+      if (!hasText(richHtml)) return fail(400, "errContentRequired");
       contentHtml = richHtml;
-      await deletePdfFromDb(existing.pdfPath);
-      deletePdfFile(existing.pdfPath);
       pdfPath = null;
     }
 
     let newSlug = existing.slug;
     if (String(req.body.regenerateSlug || "") === "on") {
       newSlug = makeSlug(title);
-      const collision = await prisma.post.findUnique({ where: { slug: newSlug } });
-      if (collision && collision.id !== existing.id) newSlug = `${newSlug}-${nanoid(6)}`;
+      if (newSlug !== existing.slug) {
+        const [collision, redirect] = await Promise.all([
+          prisma.post.findUnique({ where: { slug: newSlug } }),
+          prisma.postRedirect.findUnique({ where: { slug: newSlug } })
+        ]);
+        // Another post's current or former address stays that post's.
+        if ((collision && collision.id !== existing.id) || (redirect && redirect.postId !== existing.id)) {
+          newSlug = `${newSlug}-${nanoid(6)}`;
+        }
+      }
     }
 
-    const updatedPost = await prisma.post.update({
-      where: { id },
-      data: { slug: newSlug, type, title, postDate, contentType, contentHtml, pdfPath, autoTranslateTitle }
+    const updatedPost = await prisma.$transaction(async (tx) => {
+      const post = await tx.post.update({
+        where: { id },
+        data: { slug: newSlug, type, title, postDate, contentType, contentHtml, pdfPath, autoTranslateTitle }
+      });
+      if (newSlug !== existing.slug) {
+        // Keep the old address working (and drop this post's own redirect
+        // when it moves back to a former address).
+        await tx.postRedirect.deleteMany({ where: { slug: newSlug, postId: id } });
+        await tx.postRedirect.upsert({
+          where: { slug: existing.slug },
+          update: { postId: id },
+          create: { slug: existing.slug, postId: id }
+        });
+      }
+      return post;
     });
 
-    // Fire-and-forget: notify search engines so the updated post gets re-crawled
+    // The previous PDF is only removed once the post no longer points at it.
+    if (existing.pdfPath && existing.pdfPath !== updatedPost.pdfPath) await discardPdf(existing.pdfPath);
+
+    scheduleBackfill(1000);
+    // Notify search engines so the updated post (and an old URL) get re-crawled
     submitPost(updatedPost).catch(() => {});
+    if (existing.slug !== updatedPost.slug || existing.type !== updatedPost.type) {
+      submitPost(existing).catch(() => {});
+    }
 
     res.redirect("/admin/posts?saved=true");
   } catch (err) {
     if (isTableMissingError(err)) return res.status(503).send(SCHEMA_NOT_READY);
     console.error(err);
-    res.status(500).send("Failed to update post.");
+    return fail(500, "errSaveFailed");
   }
 });
 
 /* ---------- Post delete ---------- */
 
-router.post("/posts/:id/delete", requireAdmin, async (req, res, next) => {
+router.post("/posts/:id/delete", requireAdmin, verifyCsrf, async (req, res, next) => {
   try {
-    const { password } = req.body;
+    const password = String(req.body?.password || "");
     if (!password || !(await verifyAdminPassword(password))) {
       return res.status(401).json({ success: false, error: "Incorrect password." });
     }
@@ -677,19 +716,42 @@ router.post("/posts/:id/delete", requireAdmin, async (req, res, next) => {
     const prisma = getPrisma();
     const post = await prisma.post.findUnique({ where: { id: req.params.id } });
     if (!post) return res.status(404).json({ success: false, error: "Post not found." });
-    await deletePdfFromDb(post.pdfPath);
-    deletePdfFile(post.pdfPath);
     await prisma.post.delete({ where: { id: req.params.id } });
+    await discardPdf(post.pdfPath);
 
-    // Fire-and-forget: notify search engines so the removed URL is re-crawled
-    // (now a 404) and the section/home pages are refreshed.
+    // Notify search engines so the removed URL is re-crawled (now a 404)
+    // and the section/home pages are refreshed.
     submitPost(post).catch(() => {});
 
     res.json({ success: true });
   } catch (err) {
-    if (isTableMissingError(err)) return res.status(503).send(SCHEMA_NOT_READY);
+    if (isTableMissingError(err)) return res.status(503).json({ success: false, error: SCHEMA_NOT_READY });
     next(err);
   }
 });
+
+/* ------------------------------------------------------------------ */
+/*  Housekeeping                                                      */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Remove uploaded PDFs that no post uses (e.g. a PDF extracted while
+ * creating a post that was then cancelled). Only files older than a day.
+ */
+export async function cleanupOrphanPdfs() {
+  const prisma = getPrisma();
+  const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
+  const [files, posts] = await Promise.all([
+    prisma.pdfFile.findMany({ where: { createdAt: { lt: cutoff } }, select: { filename: true } }),
+    prisma.post.findMany({ where: { pdfPath: { not: null } }, select: { pdfPath: true } })
+  ]);
+  const used = new Set(posts.map((p) => path.basename(p.pdfPath)));
+  const orphans = files.map((f) => f.filename).filter((f) => !used.has(f));
+  if (!orphans.length) return 0;
+  await prisma.pdfFile.deleteMany({ where: { filename: { in: orphans } } });
+  for (const filename of orphans) deletePdfFile(`/uploads/${filename}`);
+  console.log(`[admin] Removed ${orphans.length} unused PDF upload(s).`);
+  return orphans.length;
+}
 
 export default router;

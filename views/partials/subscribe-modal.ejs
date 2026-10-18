@@ -1,0 +1,20 @@
+<div class="modal-overlay" id="subscribeModal" role="dialog" aria-modal="true" aria-labelledby="subscribeModalTitle" hidden>
+  <div class="modal-box subscribe-modal-box">
+    <div class="subscribe-modal-title" id="subscribeModalTitle" data-i18n="subscribe">Subscribe</div>
+    <form class="subscribe-modal-body" id="subscribeModalBody" novalidate>
+      <label class="visually-hidden" for="subscribeEmail" data-i18n="enterEmail">Enter your email address</label>
+      <input type="email" class="form-input" id="subscribeEmail" name="email" data-i18n-placeholder="enterEmail" placeholder="Enter your email address" autocomplete="email" maxlength="254" required />
+      <div class="subscribe-error" id="subscribeError" role="alert"></div>
+      <div class="modal-actions">
+        <button class="btn" id="subscribeCancel" type="button" data-i18n="cancel">Cancel</button>
+        <button class="btn primary" id="subscribeSubmit" type="submit" data-i18n="subscribe">Subscribe</button>
+      </div>
+    </form>
+    <div class="subscribe-success" id="subscribeSuccess" hidden>
+      <p data-i18n="subscribeThankYou">Thank you for subscribing to The Augustine Journal. You may unsubscribe at any time in your email.</p>
+      <div class="modal-actions">
+        <button class="btn" id="subscribeClose" type="button" data-i18n="close">Close</button>
+      </div>
+    </div>
+  </div>
+</div>

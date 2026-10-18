@@ -48,7 +48,8 @@ model Post {
   createdAt          DateTime    @default(now())
   updatedAt          DateTime    @updatedAt
 
-  views PostView[]
+  views     PostView[]
+  redirects PostRedirect[]
 
   @@index([type, postDate])
   @@index([postDate])
@@ -80,15 +81,13 @@ model Subscriber {
   email     String   @unique
   language  String   @default("en")
   createdAt DateTime @default(now())
-
-  @@index([email])
 }
 
 model EmailLog {
-  id        String   @id
-  type      String   // "WEEKLY_THROWBACK" or "NEW_POST"
-  postId    String   @map("post_id")
-  sentAt    DateTime @default(now()) @map("sent_at")
+  id     String   @id
+  type   String // "WEEKLY_THROWBACK" or "NEW_POST"
+  postId String   @map("post_id")
+  sentAt DateTime @default(now()) @map("sent_at")
 
   @@index([type, sentAt])
   @@map("email_logs")
@@ -100,4 +99,30 @@ model ThrowbackTracker {
   lastSentDate   String @default("") @map("last_sent_date")
 
   @@map("throwback_tracker")
+}
+
+model Translation {
+  id         String   @id
+  lang       String
+  sourceHash String   @map("source_hash")
+  source     String
+  text       String
+  model      String
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  @@unique([lang, sourceHash])
+  @@map("translations")
+}
+
+/// Old post URLs that redirect to the post's current slug.
+model PostRedirect {
+  slug      String   @id
+  postId    String   @map("post_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@index([postId])
+  @@map("post_redirects")
 }

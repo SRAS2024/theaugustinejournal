@@ -1,27 +1,13 @@
 <!doctype html>
-<html lang="<%= typeof detectedLang !== 'undefined' ? detectedLang : 'en' %>" translate="yes">
+<html lang="en" data-title-key="adminSite">
   <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="detected-lang" content="<%= typeof detectedLang !== 'undefined' ? detectedLang : 'en' %>" />
-    <meta name="robots" content="noindex, nofollow" />
+<%- include("../partials/admin-head") %>
     <title>Administrative Site | The Augustine Journal</title>
-    <link rel="icon" href="/public/icons/favicon.ico" sizes="48x48" />
-    <link rel="icon" href="/public/icons/favicon.svg" type="image/svg+xml" />
-    <link rel="icon" type="image/png" sizes="16x16" href="/public/icons/favicon-16.png" />
-    <link rel="icon" type="image/png" sizes="32x32" href="/public/icons/favicon-32.png" />
-    <link rel="icon" type="image/png" sizes="48x48" href="/public/icons/favicon-48.png" />
-    <link rel="apple-touch-icon" href="/public/icons/apple-touch-icon.png" />
-    <link rel="manifest" href="/public/site.webmanifest" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Inter:wght@300;400;500&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="/public/css/styles.css" />
   </head>
   <body>
     <header class="topbar">
       <div class="container header-inner">
-        <h1 class="brand notranslate">The Augustine Journal</h1>
+        <h1 class="brand" translate="no">The Augustine Journal</h1>
         <div class="admin-nav">
           <span class="muted" data-i18n="adminSite">Administrative Site</span>
         </div>
@@ -33,7 +19,7 @@
         <h2 class="listTitle" style="margin-bottom:16px;" data-i18n="adminSite">Administrative Site</h2>
 
         <% if (error) { %>
-          <div class="alert-error" data-i18n="invalidCredentials"><%= error %></div>
+          <div class="alert-error" role="alert" data-i18n="<%= typeof errorKey !== 'undefined' && errorKey ? errorKey : 'invalidCredentials' %>"><%= error %></div>
         <% } %>
 
         <form method="POST" action="/admin/login">

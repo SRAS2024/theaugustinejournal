@@ -1,46 +1,18 @@
 <!doctype html>
-<html lang="<%= typeof detectedLang !== 'undefined' ? detectedLang : 'en' %>" translate="yes">
+<html lang="en" data-title-key="dashboard">
   <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="detected-lang" content="<%= typeof detectedLang !== 'undefined' ? detectedLang : 'en' %>" />
-    <meta name="robots" content="noindex, nofollow" />
+<%- include("../partials/admin-head") %>
     <title>Dashboard | The Augustine Journal</title>
-    <link rel="icon" href="/public/icons/favicon.ico" sizes="48x48" />
-    <link rel="icon" href="/public/icons/favicon.svg" type="image/svg+xml" />
-    <link rel="icon" type="image/png" sizes="16x16" href="/public/icons/favicon-16.png" />
-    <link rel="icon" type="image/png" sizes="32x32" href="/public/icons/favicon-32.png" />
-    <link rel="icon" type="image/png" sizes="48x48" href="/public/icons/favicon-48.png" />
-    <link rel="apple-touch-icon" href="/public/icons/apple-touch-icon.png" />
-    <link rel="manifest" href="/public/site.webmanifest" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Inter:wght@300;400;500&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="/public/css/styles.css" />
   </head>
   <body>
-    <header class="topbar">
-      <div class="container header-inner">
-        <h1 class="brand notranslate"><a href="/admin/dashboard" style="color:inherit;text-decoration:none;">The Augustine Journal</a></h1>
-        <nav class="admin-nav">
-          <a href="/" data-i18n="viewSite">View Site</a>
-          <a href="/admin/dashboard" class="active" data-i18n="dashboard">Dashboard</a>
-          <a href="/admin/posts" data-i18n="posts">Posts</a>
-          <a href="/admin/settings" data-i18n="siteSettings">Site Settings</a>
-          <form method="POST" action="/admin/logout" style="display:inline;margin:0;">
-            <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
-            <button type="submit" data-i18n="logOut">Log out</button>
-          </form>
-        </nav>
-      </div>
-    </header>
+    <%- include("../partials/admin-nav", { current: "dashboard" }) %>
 
     <main class="container">
       <section class="section card">
         <h2 class="listTitle" data-i18n="dashboard">Dashboard</h2>
 
         <% if (saved) { %>
-          <div class="alert-success" data-i18n="changesSaved">Changes saved successfully.</div>
+          <div class="alert-success" role="status" data-i18n="changesSaved">Changes saved successfully.</div>
         <% } %>
 
         <div class="grid2" style="margin-bottom:20px;">

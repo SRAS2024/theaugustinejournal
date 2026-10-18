@@ -4,10 +4,17 @@ import crypto from "crypto";
 import { nanoid } from "nanoid";
 import { getPrisma } from "../lib/db.js";
 import { getIndexNowKey } from "../lib/indexnow.js";
+import { plainText } from "../lib/translation/html.js";
 
 const router = Router();
 
 const DEFAULT_SETTINGS = { id: 1, aboutHtml: "", updatedAt: new Date() };
+
+const SECTIONS = {
+  blog: { type: "BLOG", pageTitle: "Blog", key: "blog" },
+  essays: { type: "ESSAY", pageTitle: "Essays", key: "essays" },
+  letters: { type: "LETTER", pageTitle: "Letters", key: "letters" }
+};
 
 /* ------------------------------------------------------------------ */
 /*  Helpers                                                           */
@@ -27,24 +34,30 @@ function toJsonLd(obj) {
   return JSON.stringify(obj).replace(/</g, "\\u003c");
 }
 
+/** Plain-text summary of post HTML for meta descriptions and structured data. */
+function summary(html, max) {
+  const text = plainText(html);
+  if (text.length <= max) return text;
+  const cut = text.slice(0, max);
+  const space = cut.lastIndexOf(" ");
+  return `${(space > max * 0.6 ? cut.slice(0, space) : cut).replace(/[\s,;:.]+$/, "")}…`;
+}
+
 /** WebSite structured data for the home page. */
 function websiteJsonLd(siteUrl) {
   return toJsonLd({
     "@context": "https://schema.org",
     "@type": "WebSite",
     name: "The Augustine Journal",
-    url: `${siteUrl}/`
+    url: `${siteUrl}/`,
+    inLanguage: "en"
   });
 }
 
 /** Article structured data for an individual post page. */
 function articleJsonLd(post, siteUrl) {
   const url = `${siteUrl}/post/${post.slug}`;
-  const description = (post.contentHtml || "")
-    .replace(/<[^>]+>/g, " ")
-    .replace(/\s+/g, " ")
-    .trim()
-    .slice(0, 300);
+  const description = summary(post.contentHtml, 300);
 
   const obj = {
     "@context": "https://schema.org",
@@ -54,6 +67,7 @@ function articleJsonLd(post, siteUrl) {
     dateModified: new Date(post.updatedAt).toISOString(),
     mainEntityOfPage: { "@type": "WebPage", "@id": url },
     url,
+    inLanguage: "en",
     author: { "@type": "Organization", name: "The Augustine Journal" },
     publisher: {
       "@type": "Organization",
@@ -84,6 +98,28 @@ async function getCommon() {
   return { settings: settings || DEFAULT_SETTINGS, notices };
 }
 
+function notFound(res) {
+  return res.status(404).render("not-found", { title: "Page not found | The Augustine Journal", active: "" });
+}
+
+/**
+ * Count one unique view. Raw SQL so the counter does not touch the post's
+ * updatedAt (used for sitemap lastmod and dateModified).
+ */
+async function trackView(req, post) {
+  const prisma = getPrisma();
+  const ip = req.ip || "unknown";
+  const ua = req.headers["user-agent"] || "";
+  const viewerIdentifier = crypto.createHash("sha256").update(`${ip}:${ua}`).digest("hex");
+  const inserted = await prisma.$executeRaw`
+    INSERT INTO "post_views" ("id", "post_id", "viewer_identifier")
+    VALUES (${nanoid()}, ${post.id}, ${viewerIdentifier})
+    ON CONFLICT ("post_id", "viewer_identifier") DO NOTHING`;
+  if (inserted) {
+    await prisma.$executeRaw`UPDATE "Post" SET "view_count" = "view_count" + 1 WHERE "id" = ${post.id}`;
+  }
+}
+
 /* ------------------------------------------------------------------ */
 /*  Routes                                                            */
 /* ------------------------------------------------------------------ */
@@ -109,85 +145,65 @@ router.get("/", async (req, res, next) => {
   }
 });
 
-router.get("/blog", async (req, res, next) => {
-  try {
-    const prisma = getPrisma();
-    const { settings, notices } = await getCommon();
-    const posts = await safeQuery(
-      () => prisma.post.findMany({ where: { type: "BLOG" }, orderBy: [{ postDate: "desc" }, { createdAt: "desc" }] }),
-      []
-    );
-    res.render("list", { pageTitle: "Blog", settings, notices, posts, canonical: `${getSiteUrl()}/blog` });
-  } catch (err) {
-    next(err);
-  }
-});
-
-router.get("/essays", async (req, res, next) => {
-  try {
-    const prisma = getPrisma();
-    const { settings, notices } = await getCommon();
-    const posts = await safeQuery(
-      () => prisma.post.findMany({ where: { type: "ESSAY" }, orderBy: [{ postDate: "desc" }, { createdAt: "desc" }] }),
-      []
-    );
-    res.render("list", { pageTitle: "Essays", settings, notices, posts, canonical: `${getSiteUrl()}/essays` });
-  } catch (err) {
-    next(err);
-  }
-});
-
-router.get("/letters", async (req, res, next) => {
-  try {
-    const prisma = getPrisma();
-    const { settings, notices } = await getCommon();
-    const posts = await safeQuery(
-      () => prisma.post.findMany({ where: { type: "LETTER" }, orderBy: [{ postDate: "desc" }, { createdAt: "desc" }] }),
-      []
-    );
-    res.render("list", { pageTitle: "Letters", settings, notices, posts, canonical: `${getSiteUrl()}/letters` });
-  } catch (err) {
-    next(err);
-  }
-});
+for (const [path, section] of Object.entries(SECTIONS)) {
+  router.get(`/${path}`, async (req, res, next) => {
+    try {
+      const prisma = getPrisma();
+      const posts = await safeQuery(
+        () =>
+          prisma.post.findMany({
+            where: { type: section.type },
+            orderBy: [{ postDate: "desc" }, { createdAt: "desc" }],
+            select: { id: true, slug: true, title: true, postDate: true, autoTranslateTitle: true }
+          }),
+        []
+      );
+      res.render("list", {
+        pageTitle: section.pageTitle,
+        pageKey: section.key,
+        posts,
+        canonical: `${getSiteUrl()}/${path}`
+      });
+    } catch (err) {
+      next(err);
+    }
+  });
+}
 
 router.get("/post/:slug", async (req, res, next) => {
   try {
     const prisma = getPrisma();
-    const { settings, notices } = await getCommon();
     const post = await safeQuery(
       () => prisma.post.findUnique({ where: { slug: req.params.slug } }),
       null
     );
-    if (!post) return res.status(404).send("Post not found.");
-
-    // Track unique view (fire-and-forget, don't block response)
-    try {
-      const ip = req.headers["x-forwarded-for"]?.split(",")[0]?.trim() || req.ip || "unknown";
-      const ua = req.headers["user-agent"] || "";
-      const viewerIdentifier = crypto.createHash("sha256").update(`${ip}:${ua}`).digest("hex");
-
-      const existing = await prisma.postView.findUnique({
-        where: { postId_viewerIdentifier: { postId: post.id, viewerIdentifier } }
-      });
-
-      if (!existing) {
-        await prisma.$transaction([
-          prisma.postView.create({
-            data: { id: nanoid(), postId: post.id, viewerIdentifier }
-          }),
-          prisma.post.update({
-            where: { id: post.id },
-            data: { viewCount: { increment: 1 } }
-          })
-        ]);
+    if (!post) {
+      // An old URL from before the slug was regenerated?
+      const redirect = await safeQuery(
+        () => prisma.postRedirect.findUnique({ where: { slug: req.params.slug }, include: { post: { select: { slug: true } } } }),
+        null
+      );
+      if (redirect?.post) {
+        // Permanent for search engines, but not cached by browsers (a slug
+        // may later be changed back).
+        res.set("Cache-Control", "no-store");
+        return res.redirect(301, `/post/${encodeURIComponent(redirect.post.slug)}`);
       }
-    } catch {
-      // View tracking should never break the page
+      return notFound(res);
+    }
+
+    // View tracking must never break the page.
+    if (req.method === "GET") {
+      trackView(req, post).catch(() => {});
     }
 
     const siteUrl = getSiteUrl();
-    res.render("post", { settings, notices, post, siteUrl, jsonLd: articleJsonLd(post, siteUrl) });
+    res.render("post", {
+      post,
+      siteUrl,
+      description: summary(post.contentHtml, 200),
+      jsonLd: articleJsonLd(post, siteUrl)
+    });
   } catch (err) {
     next(err);
   }
@@ -202,49 +218,47 @@ router.get("/sitemap.xml", async (req, res, next) => {
     const prisma = getPrisma();
     const siteUrl = getSiteUrl();
 
-    const posts = await safeQuery(
-      () =>
-        prisma.post.findMany({
-          select: { slug: true, type: true, updatedAt: true },
-          orderBy: [{ postDate: "desc" }, { createdAt: "desc" }]
-        }),
-      []
-    );
+    const [posts, { settings, notices }] = await Promise.all([
+      safeQuery(
+        () =>
+          prisma.post.findMany({
+            select: { slug: true, type: true, updatedAt: true },
+            orderBy: [{ postDate: "desc" }, { createdAt: "desc" }]
+          }),
+        []
+      ),
+      getCommon()
+    ]);
 
     const day = (d) => new Date(d).toISOString().split("T")[0];
+    const latest = (dates) => dates.filter(Boolean).reduce((max, d) => (!max || d > max ? d : max), null);
 
     // Most recent change overall (for the home page) and per section (for the
     // listing pages) so search engines re-crawl those pages — and discover the
     // new post links on them — whenever a post is added, edited, or removed.
-    const latestFor = (filter) => {
-      const matches = filter ? posts.filter(filter) : posts;
-      if (!matches.length) return null;
-      return matches.reduce(
-        (max, p) => (p.updatedAt > max ? p.updatedAt : max),
-        matches[0].updatedAt
-      );
-    };
+    const latestFor = (type) => latest(posts.filter((p) => !type || p.type === type).map((p) => p.updatedAt));
 
     const staticPages = [
-      { path: "/", lastmod: latestFor(null) },
-      { path: "/blog", lastmod: latestFor((p) => p.type === "BLOG") },
-      { path: "/essays", lastmod: latestFor((p) => p.type === "ESSAY") },
-      { path: "/letters", lastmod: latestFor((p) => p.type === "LETTER") }
+      { path: "/", lastmod: latest([latestFor(null), settings?.updatedAt, ...notices.map((n) => n.updatedAt)]) },
+      { path: "/blog", lastmod: latestFor("BLOG") },
+      { path: "/essays", lastmod: latestFor("ESSAY") },
+      { path: "/letters", lastmod: latestFor("LETTER") }
     ];
 
+    const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;");
     let xml = '<?xml version="1.0" encoding="UTF-8"?>\n';
     xml += '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n';
 
     for (const page of staticPages) {
       xml += "  <url>\n";
-      xml += `    <loc>${siteUrl}${page.path}</loc>\n`;
+      xml += `    <loc>${esc(siteUrl + page.path)}</loc>\n`;
       if (page.lastmod) xml += `    <lastmod>${day(page.lastmod)}</lastmod>\n`;
       xml += "  </url>\n";
     }
 
     for (const post of posts) {
       xml += "  <url>\n";
-      xml += `    <loc>${siteUrl}/post/${post.slug}</loc>\n`;
+      xml += `    <loc>${esc(`${siteUrl}/post/${encodeURIComponent(post.slug)}`)}</loc>\n`;
       xml += `    <lastmod>${day(post.updatedAt)}</lastmod>\n`;
       xml += "  </url>\n";
     }
@@ -266,8 +280,9 @@ router.get("/robots.txt", (_req, res) => {
   const lines = [
     "User-agent: *",
     "Disallow: /admin",
+    "Disallow: /api/",
     "",
-    "Sitemap: https://theaugustinejournal.com/sitemap.xml"
+    `Sitemap: ${getSiteUrl()}/sitemap.xml`
   ];
   res.set("Content-Type", "text/plain");
   res.send(lines.join("\n"));

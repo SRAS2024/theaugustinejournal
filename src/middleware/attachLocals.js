@@ -1,4 +1,4 @@
-const SUPPORTED_LANGS = ["en", "pt", "es", "fr", "de", "it"];
+import { SITE_LANGS } from "../lib/languages.js";
 
 /**
  * Parse the Accept-Language header and return the best matching supported
@@ -7,32 +7,34 @@ const SUPPORTED_LANGS = ["en", "pt", "es", "fr", "de", "it"];
 function detectLangFromHeader(acceptLanguage) {
   if (!acceptLanguage) return "en";
 
-  const parts = acceptLanguage
+  const parts = String(acceptLanguage)
     .split(",")
-    .map((part) => {
-      const [lang, qPart] = part.trim().split(";");
-      const q = qPart ? parseFloat(qPart.split("=")[1]) : 1;
-      return { lang: lang.trim().toLowerCase(), q: Number.isNaN(q) ? 0 : q };
+    .map((part, index) => {
+      const [lang, ...params] = part.trim().split(";");
+      const qParam = params.find((p) => p.trim().startsWith("q="));
+      const q = qParam ? parseFloat(qParam.trim().slice(2)) : 1;
+      return { lang: lang.trim().toLowerCase(), q: Number.isNaN(q) ? 0 : q, index };
     })
-    .sort((a, b) => b.q - a.q);
+    .filter((p) => p.lang && p.q > 0)
+    .sort((a, b) => b.q - a.q || a.index - b.index);
 
   for (const { lang } of parts) {
     const base = lang.split("-")[0];
-    if (SUPPORTED_LANGS.includes(base)) return base;
+    if (SITE_LANGS.includes(base)) return base;
   }
 
   return "en";
 }
 
 export function attachLocals(req, res, next) {
-  // CSRF middleware is only enabled when DATABASE_URL is configured.
-  // If it is not enabled, req.csrfToken will not exist.
-  res.locals.csrfToken = typeof req.csrfToken === "function" ? req.csrfToken() : "";
+  res.locals.csrfToken = "";
   res.locals.isAdmin = Boolean(req.session?.admin?.isLoggedIn);
   res.locals.adminName = req.session?.admin?.name || "";
   res.locals.siteTitle = "The Augustine Journal";
+  res.locals.siteLangs = SITE_LANGS;
 
-  // Detect preferred language from the Accept-Language request header
+  // The visitor's preferred language from the Accept-Language header. The
+  // page itself is always served in English; the browser translates it.
   res.locals.detectedLang = detectLangFromHeader(req.headers["accept-language"]);
 
   next();

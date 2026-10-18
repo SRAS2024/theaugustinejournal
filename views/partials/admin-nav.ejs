@@ -1,0 +1,15 @@
+<header class="topbar">
+  <div class="container header-inner">
+    <h1 class="brand" translate="no"><a href="/admin/dashboard" style="color:inherit;text-decoration:none;">The Augustine Journal</a></h1>
+    <nav class="admin-nav" aria-label="Admin navigation">
+      <a href="/" data-i18n="viewSite">View Site</a>
+      <a href="/admin/dashboard"<%- current === 'dashboard' ? ' class="active" aria-current="page"' : '' %> data-i18n="dashboard">Dashboard</a>
+      <a href="/admin/posts"<%- current === 'posts' ? ' class="active" aria-current="page"' : '' %> data-i18n="posts">Posts</a>
+      <a href="/admin/settings"<%- current === 'settings' ? ' class="active" aria-current="page"' : '' %> data-i18n="siteSettings">Site Settings</a>
+      <form method="POST" action="/admin/logout" style="display:inline;margin:0;">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
+        <button type="submit" data-i18n="logOut">Log out</button>
+      </form>
+    </nav>
+  </div>
+</header>

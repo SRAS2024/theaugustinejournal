@@ -1,36 +1,8 @@
-<%
-  function formatDate(d) {
-    try {
-      return new Date(d).toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" });
-    } catch (e) {
-      return "";
-    }
-  }
-
-  const rows = (posts || []).map(p => `
-    <div class="postRow">
-      <div>
-        <p class="title">
-          <a href="/post/${p.slug}"${p.autoTranslateTitle === false ? ' class="notranslate"' : ''} ${p.autoTranslateTitle !== false ? ' data-translate="content"' : ''} data-original="${String(p.title || "").replace(/"/g, "&quot;")}">${p.title}</a>
-        </p>
-        <div class="date">${formatDate(p.postDate)}</div>
-      </div>
-    </div>
-  `).join("");
-
-  const body = `
-    <section class="section card">
-      <h2 class="listTitle" data-i18n="${pageTitle === "Blog" ? "blog" : pageTitle === "Essays" ? "essays" : "letters"}">${pageTitle}</h2>
-
-      ${rows.length ? rows : `<div class="empty-state" data-i18n="noPostsYet">No posts yet.</div>`}
-    </section>
-  `;
-%>
-
 <%- include("layout", {
   title: `${pageTitle} | The Augustine Journal`,
-  active: pageTitle === "Blog" ? "blog" : pageTitle === "Essays" ? "essays" : "letters",
-  body,
+  titleKey: pageKey,
+  active: pageKey,
+  body: include("pages/list", locals),
   ogUrl: typeof canonical !== 'undefined' ? canonical : undefined,
   ogTitle: `${pageTitle} | The Augustine Journal`,
   ogDescription: `${pageTitle} from The Augustine Journal, thoughtful reflection and discourse.`

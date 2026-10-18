@@ -1,47 +1,18 @@
 <!doctype html>
-<html lang="<%= typeof detectedLang !== 'undefined' ? detectedLang : 'en' %>" translate="yes">
+<html lang="en" data-title-key="posts">
   <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="detected-lang" content="<%= typeof detectedLang !== 'undefined' ? detectedLang : 'en' %>" />
-    <meta name="robots" content="noindex, nofollow" />
-    <meta name="csrf-token" content="<%= csrfToken %>" />
+<%- include("../partials/admin-head") %>
     <title>Posts | The Augustine Journal</title>
-    <link rel="icon" href="/public/icons/favicon.ico" sizes="48x48" />
-    <link rel="icon" href="/public/icons/favicon.svg" type="image/svg+xml" />
-    <link rel="icon" type="image/png" sizes="16x16" href="/public/icons/favicon-16.png" />
-    <link rel="icon" type="image/png" sizes="32x32" href="/public/icons/favicon-32.png" />
-    <link rel="icon" type="image/png" sizes="48x48" href="/public/icons/favicon-48.png" />
-    <link rel="apple-touch-icon" href="/public/icons/apple-touch-icon.png" />
-    <link rel="manifest" href="/public/site.webmanifest" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Inter:wght@300;400;500&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="/public/css/styles.css" />
   </head>
   <body>
-    <header class="topbar">
-      <div class="container header-inner">
-        <h1 class="brand notranslate"><a href="/admin/dashboard" style="color:inherit;text-decoration:none;">The Augustine Journal</a></h1>
-        <nav class="admin-nav">
-          <a href="/" data-i18n="viewSite">View Site</a>
-          <a href="/admin/dashboard" data-i18n="dashboard">Dashboard</a>
-          <a href="/admin/posts" class="active" data-i18n="posts">Posts</a>
-          <a href="/admin/settings" data-i18n="siteSettings">Site Settings</a>
-          <form method="POST" action="/admin/logout" style="display:inline;margin:0;">
-            <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
-            <button type="submit" data-i18n="logOut">Log out</button>
-          </form>
-        </nav>
-      </div>
-    </header>
+    <%- include("../partials/admin-nav", { current: "posts" }) %>
 
     <main class="container">
       <section class="section card">
         <h2 class="listTitle" data-i18n="posts">Posts</h2>
 
         <% if (saved) { %>
-          <div class="alert-success" data-i18n="changesSaved">Changes saved successfully.</div>
+          <div class="alert-success" role="status" data-i18n="changesSaved">Changes saved successfully.</div>
         <% } %>
 
         <div style="display:flex;justify-content:center;gap:8px;flex-wrap:wrap;margin-bottom:18px;">
@@ -58,24 +29,28 @@
 
         <div style="display:grid;gap:8px;">
           <% (posts || []).forEach(function(p) { %>
+            <% const views = p.viewCount || 0; const shares = p.shareCount || 0; %>
             <div class="postRow">
               <div>
                 <div class="title" style="margin:0;">
-                  <a href="/post/<%= p.slug %>" target="_blank" rel="noopener noreferrer"><%= p.title %></a>
-                  <span style="font-size:11px;color:rgba(138,138,153,0.6);font-family:var(--font-sans);font-weight:400;margin-left:8px;"><%= p.viewCount || 0 %> <%= (p.viewCount || 0) === 1 ? 'view' : 'views' %> &middot; <%= p.shareCount || 0 %> <%= (p.shareCount || 0) === 1 ? 'share' : 'shares' %></span>
+                  <a href="/post/<%= encodeURIComponent(p.slug) %>" target="_blank" rel="noopener noreferrer" translate="no"><%= p.title %></a>
+                  <span style="font-size:11px;color:rgba(138,138,153,0.85);font-family:var(--font-sans);font-weight:400;margin-left:8px;"><span data-i18n-count="viewsCount" data-count="<%= views %>"><%= views %> <%= views === 1 ? 'view' : 'views' %></span> &middot; <span data-i18n-count="sharesCount" data-count="<%= shares %>"><%= shares %> <%= shares === 1 ? 'share' : 'shares' %></span></span>
                 </div>
                 <div class="muted" style="margin-top:6px;font-size:12px;">
                   <span data-i18n="<%= p.type === 'BLOG' ? 'blog' : (p.type === 'ESSAY' ? 'essay' : 'letter') %>"><%= p.type === 'BLOG' ? 'Blog' : (p.type === 'ESSAY' ? 'Essay' : 'Letter') %></span> &middot;
-                  <%= new Date(p.postDate).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' }) %> &middot;
-                  <span data-i18n="<%= p.contentType === 'PDF' ? '' : 'editor' %>"><%= p.contentType === 'PDF' ? 'PDF' : 'Editor' %></span>
+                  <time datetime="<%= isoDate(p.postDate) %>" data-i18n-date><%= formatDate(p.postDate) %></time> &middot;
+                  <span data-i18n="<%= p.contentType === 'PDF' ? 'pdf' : 'editor' %>"><%= p.contentType === 'PDF' ? 'PDF' : 'Editor' %></span>
                 </div>
               </div>
 
               <div style="display:flex;gap:8px;align-items:center;flex-shrink:0;">
-                <a class="btn" href="/admin/posts/<%= p.id %>/edit" data-i18n="edit">Edit</a>
-                <button class="btn danger delete-post-btn" type="button" data-i18n="delete_"
-                  data-post-id="<%= p.id %>"
-                  data-post-title="<%= p.title %>"
+                <a class="btn" href="/admin/posts/<%= encodeURIComponent(p.id) %>/edit" data-i18n="edit">Edit</a>
+                <button class="btn danger" type="button" data-i18n="delete_"
+                  data-confirm-url="/admin/posts/<%= encodeURIComponent(p.id) %>/delete"
+                  data-confirm-key="deletePostQuestion"
+                  data-confirm-action="delete_"
+                  data-confirm-item="<%= p.title %>"
+                  data-confirm-redirect="/admin/posts?saved=true"
                 >Delete</button>
               </div>
             </div>
@@ -84,128 +59,9 @@
       </section>
     </main>
 
-    <!-- Delete Confirmation Modal -->
-    <div class="modal-overlay" id="deleteConfirmModal">
-      <div class="modal-box">
-        <p class="modal-message">Are you sure you want to delete this post?</p>
-        <p class="modal-post-name" id="deletePostName"></p>
-        <div class="modal-actions">
-          <button class="btn" type="button" id="cancelDeleteBtn">Cancel</button>
-          <button class="btn danger" type="button" id="confirmDeleteBtn">Delete</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- Password Confirmation Modal -->
-    <div class="modal-overlay" id="passwordModal">
-      <div class="modal-box">
-        <p class="modal-message">Please enter administrative password</p>
-        <input type="password" class="form-input" id="adminPasswordInput" autocomplete="off" />
-        <p class="modal-error" id="passwordError">Incorrect password.</p>
-        <div class="modal-actions">
-          <button class="btn" type="button" id="cancelPasswordBtn">Cancel</button>
-          <button class="btn danger" type="button" id="confirmPasswordBtn">Confirm</button>
-        </div>
-      </div>
-    </div>
-
-    <script>
-      (function() {
-        var deletePostId = null;
-        var csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
-
-        var deleteConfirmModal = document.getElementById('deleteConfirmModal');
-        var passwordModal = document.getElementById('passwordModal');
-        var deletePostName = document.getElementById('deletePostName');
-        var passwordInput = document.getElementById('adminPasswordInput');
-        var passwordError = document.getElementById('passwordError');
-        var confirmPasswordBtn = document.getElementById('confirmPasswordBtn');
-
-        // Attach click handlers to all delete buttons via delegation
-        document.querySelectorAll('.delete-post-btn').forEach(function(btn) {
-          btn.addEventListener('click', function() {
-            deletePostId = btn.getAttribute('data-post-id');
-            deletePostName.textContent = btn.getAttribute('data-post-title');
-            deleteConfirmModal.classList.add('active');
-          });
-        });
-
-        // First modal: Cancel
-        document.getElementById('cancelDeleteBtn').addEventListener('click', function() {
-          deleteConfirmModal.classList.remove('active');
-          deletePostId = null;
-        });
-
-        // First modal: Delete → open password modal
-        document.getElementById('confirmDeleteBtn').addEventListener('click', function() {
-          deleteConfirmModal.classList.remove('active');
-          passwordInput.value = '';
-          passwordError.style.display = 'none';
-          passwordModal.classList.add('active');
-          passwordInput.focus();
-        });
-
-        // Second modal: Cancel
-        document.getElementById('cancelPasswordBtn').addEventListener('click', function() {
-          passwordModal.classList.remove('active');
-          deletePostId = null;
-        });
-
-        // Second modal: Confirm with password
-        function submitPassword() {
-          var password = passwordInput.value;
-          if (!password) {
-            passwordError.style.display = 'block';
-            return;
-          }
-          confirmPasswordBtn.disabled = true;
-          confirmPasswordBtn.textContent = '...';
-
-          fetch('/admin/posts/' + encodeURIComponent(deletePostId) + '/delete', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'x-csrf-token': csrfToken
-            },
-            body: JSON.stringify({ password: password })
-          }).then(function(res) {
-            return res.json();
-          }).then(function(data) {
-            if (data.success) {
-              window.location.href = '/admin/posts?saved=true';
-            } else {
-              passwordError.style.display = 'block';
-              confirmPasswordBtn.disabled = false;
-              confirmPasswordBtn.textContent = 'Confirm';
-            }
-          }).catch(function() {
-            passwordError.style.display = 'block';
-            confirmPasswordBtn.disabled = false;
-            confirmPasswordBtn.textContent = 'Confirm';
-          });
-        }
-
-        confirmPasswordBtn.addEventListener('click', submitPassword);
-        passwordInput.addEventListener('keydown', function(e) {
-          if (e.key === 'Enter') submitPassword();
-        });
-
-        // Close modals when clicking the overlay background
-        deleteConfirmModal.addEventListener('click', function(e) {
-          if (e.target === deleteConfirmModal) {
-            deleteConfirmModal.classList.remove('active');
-            deletePostId = null;
-          }
-        });
-        passwordModal.addEventListener('click', function(e) {
-          if (e.target === passwordModal) {
-            passwordModal.classList.remove('active');
-            deletePostId = null;
-          }
-        });
-      })();
-    </script>
+    <%- include("../partials/admin-confirm-modals") %>
 
     <script src="/public/js/i18n.js"></script>
+    <script src="/public/js/admin-confirm.js"></script>
   </body>
 </html>

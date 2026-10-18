@@ -1,479 +1,633 @@
+/* The Augustine Journal — automatic translation for visitors.
+ *
+ * The page is always served in English. When the visitor's browser prefers
+ * Spanish, Portuguese, French, German or Russian, this script:
+ *   1. translates interface text from the built-in dictionaries below,
+ *   2. shows dates and counts the way that language writes them, and
+ *   3. replaces post titles, post bodies, notices and the home page text with
+ *      translations from the site's own translation engine (/api/translations),
+ *      which keeps translating in the background until every part is done.
+ * Nothing is remembered between visits, so a shared link always opens in the
+ * reader's own language.
+ */
 (function () {
   "use strict";
 
   var SITE_LANG = "en";
-  var SUPPORTED = ["en", "pt", "es", "fr", "de", "it"];
+  var SUPPORTED = ["en", "es", "pt", "fr", "de", "ru"];
+  var LOCALES = { en: "en-US", es: "es", pt: "pt-BR", fr: "fr", de: "de", ru: "ru" };
+  var NNBSP = " ";
 
-  /* ===== UI string translations (static labels) ===== */
+  /* ===== Interface text ===== */
   var ui = {
     /* ── Public navigation ── */
-    home:        { en: "Home",    pt: "In\u00edcio",  es: "Inicio",   fr: "Accueil",    de: "Startseite", it: "Home" },
-    blog:        { en: "Blog",    pt: "Blog",         es: "Blog",     fr: "Blog",       de: "Blog",        it: "Blog" },
-    essays:      { en: "Essays",  pt: "Ensaios",      es: "Ensayos",  fr: "Essais",     de: "Essays",      it: "Saggi" },
-    essay:       { en: "Essay",   pt: "Ensaio",       es: "Ensayo",   fr: "Essai",      de: "Essay",       it: "Saggio" },
-    letters:     { en: "Letters", pt: "Cartas",       es: "Cartas",   fr: "Lettres",    de: "Briefe",      it: "Lettere" },
-    letter:      { en: "Letter",  pt: "Carta",        es: "Carta",    fr: "Lettre",     de: "Brief",       it: "Lettera" },
+    home:    { en: "Home",    es: "Inicio",   pt: "Início",  fr: "Accueil", de: "Startseite", ru: "Главная" },
+    blog:    { en: "Blog",    es: "Blog",     pt: "Blog",    fr: "Blog",    de: "Blog",       ru: "Блог" },
+    essays:  { en: "Essays",  es: "Ensayos",  pt: "Ensaios", fr: "Essais",  de: "Essays",     ru: "Эссе" },
+    essay:   { en: "Essay",   es: "Ensayo",   pt: "Ensaio",  fr: "Essai",   de: "Essay",      ru: "Эссе" },
+    letters: { en: "Letters", es: "Cartas",   pt: "Cartas",  fr: "Lettres", de: "Briefe",     ru: "Письма" },
+    letter:  { en: "Letter",  es: "Carta",    pt: "Carta",   fr: "Lettre",  de: "Brief",      ru: "Письмо" },
+    toggleNavigation:  { en: "Toggle navigation", es: "Abrir o cerrar el menú", pt: "Abrir ou fechar o menu", fr: "Ouvrir ou fermer le menu", de: "Menü öffnen oder schließen", ru: "Открыть или закрыть меню" },
+    primaryNavigation: { en: "Primary navigation", es: "Navegación principal", pt: "Navegação principal", fr: "Navigation principale", de: "Hauptnavigation", ru: "Основная навигация" },
 
     /* ── Public content labels ── */
     checkLatest: {
       en: "Check out our latest post",
-      pt: "Confira nossa publica\u00e7\u00e3o mais recente",
-      es: "Mira nuestra publicaci\u00f3n m\u00e1s reciente",
-      fr: "D\u00e9couvrez notre derni\u00e8re publication",
-      de: "Schauen Sie sich unseren neuesten Beitrag an",
-      it: "Dai un'occhiata al nostro ultimo articolo"
+      es: "Mira nuestra publicación más reciente",
+      pt: "Confira nossa publicação mais recente",
+      fr: "Découvrez notre dernière publication",
+      de: "Lesen Sie unseren neuesten Beitrag",
+      ru: "Читайте нашу последнюю публикацию"
     },
     noPostsYet: {
       en: "No posts yet.",
-      pt: "Nenhuma publica\u00e7\u00e3o ainda.",
-      es: "No hay publicaciones todav\u00eda.",
+      es: "Todavía no hay publicaciones.",
+      pt: "Ainda não há publicações.",
       fr: "Aucune publication pour le moment.",
-      de: "Noch keine Beitr\u00e4ge.",
-      it: "Nessun articolo ancora."
+      de: "Noch keine Beiträge.",
+      ru: "Публикаций пока нет."
     },
-    share:   { en: "Share",             pt: "Compartilhar",       es: "Compartir",          fr: "Partager",             de: "Teilen",               it: "Condividi" },
-    viewPdf: { en: "View Original PDF", pt: "Ver PDF Original",   es: "Ver PDF Original",   fr: "Voir le PDF Original", de: "Original-PDF anzeigen", it: "Visualizza PDF Originale" },
-    linkCopied: { en: "Link copied!",   pt: "Link copiado!",      es: "\u00a1Enlace copiado!", fr: "Lien copi\u00e9\u00a0!", de: "Link kopiert!",      it: "Link copiato!" },
+    share:      { en: "Share", es: "Compartir", pt: "Compartilhar", fr: "Partager", de: "Teilen", ru: "Поделиться" },
+    viewPdf:    { en: "View Original PDF", es: "Ver el PDF original", pt: "Ver o PDF original", fr: "Voir le PDF original", de: "Original-PDF ansehen", ru: "Открыть исходный PDF" },
+    linkCopied: { en: "Link copied!", es: "¡Enlace copiado!", pt: "Link copiado!", fr: "Lien copié" + NNBSP + "!", de: "Link kopiert!", ru: "Ссылка скопирована!" },
+    copyFailed: { en: "Could not copy the link", es: "No se pudo copiar el enlace", pt: "Não foi possível copiar o link", fr: "Impossible de copier le lien", de: "Der Link konnte nicht kopiert werden", ru: "Не удалось скопировать ссылку" },
+    close:      { en: "Close", es: "Cerrar", pt: "Fechar", fr: "Fermer", de: "Schließen", ru: "Закрыть" },
+    somethingWentWrong: {
+      en: "Something went wrong. Please try again.",
+      es: "Algo salió mal. Inténtalo de nuevo.",
+      pt: "Algo deu errado. Tente novamente.",
+      fr: "Une erreur s’est produite. Veuillez réessayer.",
+      de: "Etwas ist schiefgelaufen. Bitte versuchen Sie es erneut.",
+      ru: "Что-то пошло не так. Попробуйте ещё раз."
+    },
+    pageNotFound: { en: "Page not found", es: "Página no encontrada", pt: "Página não encontrada", fr: "Page introuvable", de: "Seite nicht gefunden", ru: "Страница не найдена" },
+    pageNotFoundMessage: {
+      en: "The page you are looking for does not exist or has been moved.",
+      es: "La página que buscas no existe o se ha movido.",
+      pt: "A página que você procura não existe ou foi movida.",
+      fr: "La page que vous recherchez n’existe pas ou a été déplacée.",
+      de: "Die gesuchte Seite existiert nicht oder wurde verschoben.",
+      ru: "Страница, которую вы ищете, не существует или была перемещена."
+    },
+    backToHome: { en: "Back to the home page", es: "Volver a la página de inicio", pt: "Voltar à página inicial", fr: "Retour à l’accueil", de: "Zurück zur Startseite", ru: "Вернуться на главную" },
 
     /* ── Footer ── */
     allRightsReserved: {
       en: "All Rights Reserved.",
-      pt: "Todos os Direitos Reservados.",
-      es: "Todos los Derechos Reservados.",
-      fr: "Tous Droits R\u00e9serv\u00e9s.",
+      es: "Todos los derechos reservados.",
+      pt: "Todos os direitos reservados.",
+      fr: "Tous droits réservés.",
       de: "Alle Rechte vorbehalten.",
-      it: "Tutti i Diritti Riservati."
+      ru: "Все права защищены."
     },
 
     /* ── Admin: login ── */
-    adminSite:           { en: "Administrative Site",   pt: "Site Administrativo",          es: "Sitio Administrativo",          fr: "Site Administratif",          de: "Verwaltungsseite",            it: "Sito Amministrativo" },
-    username:            { en: "Username",              pt: "Nome de usu\u00e1rio",         es: "Nombre de usuario",             fr: "Nom d\u2019utilisateur",      de: "Benutzername",                it: "Nome utente" },
-    password:            { en: "Password",              pt: "Senha",                        es: "Contrase\u00f1a",               fr: "Mot de passe",                de: "Passwort",                    it: "Password" },
-    signIn:              { en: "Sign in",               pt: "Entrar",                       es: "Iniciar sesi\u00f3n",           fr: "Se connecter",                de: "Anmelden",                    it: "Accedi" },
-    invalidCredentials:  { en: "Invalid credentials.",  pt: "Credenciais inv\u00e1lidas.",   es: "Credenciales inv\u00e1lidas.",  fr: "Identifiants invalides.",     de: "Ung\u00fcltige Anmeldedaten.", it: "Credenziali non valide." },
+    adminSite:          { en: "Administrative Site", es: "Sitio de administración", pt: "Área administrativa", fr: "Espace d’administration", de: "Verwaltungsbereich", ru: "Панель администратора" },
+    username:           { en: "Username", es: "Nombre de usuario", pt: "Nome de usuário", fr: "Nom d’utilisateur", de: "Benutzername", ru: "Имя пользователя" },
+    password:           { en: "Password", es: "Contraseña", pt: "Senha", fr: "Mot de passe", de: "Passwort", ru: "Пароль" },
+    signIn:             { en: "Sign in", es: "Iniciar sesión", pt: "Entrar", fr: "Se connecter", de: "Anmelden", ru: "Войти" },
+    invalidCredentials: { en: "Invalid credentials.", es: "Credenciales no válidas.", pt: "Credenciais inválidas.", fr: "Identifiants incorrects.", de: "Ungültige Anmeldedaten.", ru: "Неверные учётные данные." },
+    tooManyAttempts: {
+      en: "Too many sign-in attempts. Please wait a few minutes and try again.",
+      es: "Demasiados intentos de inicio de sesión. Espera unos minutos e inténtalo de nuevo.",
+      pt: "Muitas tentativas de login. Aguarde alguns minutos e tente novamente.",
+      fr: "Trop de tentatives de connexion. Veuillez patienter quelques minutes, puis réessayer.",
+      de: "Zu viele Anmeldeversuche. Bitte warten Sie einige Minuten und versuchen Sie es erneut.",
+      ru: "Слишком много попыток входа. Подождите несколько минут и попробуйте снова."
+    },
 
     /* ── Admin: welcome ── */
-    welcome:            { en: "Welcome,",               pt: "Bem-vindo,",                   es: "Bienvenido,",                   fr: "Bienvenue,",                  de: "Willkommen,",                 it: "Benvenuto," },
-    loadingDashboard:   { en: "Loading your dashboard\u2026", pt: "Carregando seu painel\u2026", es: "Cargando tu panel\u2026",  fr: "Chargement du tableau de bord\u2026", de: "Dashboard wird geladen\u2026", it: "Caricamento della dashboard\u2026" },
+    welcomeName:      { en: "Welcome, {name}!", es: "¡Bienvenido, {name}!", pt: "Bem-vindo, {name}!", fr: "Bienvenue, {name}" + NNBSP + "!", de: "Willkommen, {name}!", ru: "Добро пожаловать, {name}!" },
+    loadingDashboard: { en: "Loading your dashboard…", es: "Cargando tu panel…", pt: "Carregando seu painel…", fr: "Chargement de votre tableau de bord…", de: "Ihr Dashboard wird geladen…", ru: "Загрузка панели управления…" },
 
     /* ── Admin: navigation ── */
-    viewSite:     { en: "View Site",      pt: "Ver Site",           es: "Ver Sitio",          fr: "Voir le Site",        de: "Seite ansehen",       it: "Vedi Sito" },
-    dashboard:    { en: "Dashboard",      pt: "Painel",             es: "Panel",              fr: "Tableau de bord",     de: "Dashboard",           it: "Pannello" },
-    posts:        { en: "Posts",           pt: "Publica\u00e7\u00f5es", es: "Publicaciones",  fr: "Publications",        de: "Beitr\u00e4ge",       it: "Articoli" },
-    siteSettings: { en: "Site Settings",  pt: "Configura\u00e7\u00f5es do Site", es: "Configuraci\u00f3n del Sitio", fr: "Param\u00e8tres du Site", de: "Seiteneinstellungen", it: "Impostazioni Sito" },
-    logOut:       { en: "Log out",        pt: "Sair",               es: "Cerrar sesi\u00f3n", fr: "Se d\u00e9connecter", de: "Abmelden",            it: "Esci" },
+    viewSite:     { en: "View Site", es: "Ver el sitio", pt: "Ver o site", fr: "Voir le site", de: "Website ansehen", ru: "Открыть сайт" },
+    dashboard:    { en: "Dashboard", es: "Panel", pt: "Painel", fr: "Tableau de bord", de: "Dashboard", ru: "Панель управления" },
+    posts:        { en: "Posts", es: "Publicaciones", pt: "Publicações", fr: "Publications", de: "Beiträge", ru: "Публикации" },
+    siteSettings: { en: "Site Settings", es: "Configuración del sitio", pt: "Configurações do site", fr: "Paramètres du site", de: "Website-Einstellungen", ru: "Настройки сайта" },
+    logOut:       { en: "Log out", es: "Cerrar sesión", pt: "Sair", fr: "Se déconnecter", de: "Abmelden", ru: "Выйти" },
 
     /* ── Admin: dashboard ── */
-    totalPosts:   { en: "Total Posts",    pt: "Total de Publica\u00e7\u00f5es", es: "Total de Publicaciones", fr: "Total des Publications", de: "Gesamtbeitr\u00e4ge", it: "Totale Articoli" },
-    blogPosts:    { en: "Blog Posts",     pt: "Posts do Blog",      es: "Posts del Blog",     fr: "Articles de Blog",    de: "Blog-Beitr\u00e4ge",  it: "Articoli del Blog" },
-    notices:      { en: "Notices",        pt: "Avisos",             es: "Avisos",             fr: "Avis",                de: "Hinweise",            it: "Avvisi" },
-    createPost:   { en: "Create Post",    pt: "Criar Publica\u00e7\u00e3o", es: "Crear Publicaci\u00f3n", fr: "Cr\u00e9er une Publication", de: "Beitrag erstellen", it: "Crea Articolo" },
-    managePosts:  { en: "Manage Posts",   pt: "Gerenciar Publica\u00e7\u00f5es", es: "Administrar Publicaciones", fr: "G\u00e9rer les Publications", de: "Beitr\u00e4ge verwalten", it: "Gestisci Articoli" },
-    changesSaved: { en: "Changes saved successfully.", pt: "Altera\u00e7\u00f5es salvas com sucesso.", es: "Cambios guardados correctamente.", fr: "Modifications enregistr\u00e9es avec succ\u00e8s.", de: "\u00c4nderungen erfolgreich gespeichert.", it: "Modifiche salvate con successo." },
+    totalPosts:   { en: "Total Posts", es: "Total de publicaciones", pt: "Total de publicações", fr: "Total des publications", de: "Beiträge insgesamt", ru: "Всего публикаций" },
+    blogPosts:    { en: "Blog Posts", es: "Entradas del blog", pt: "Posts do blog", fr: "Articles de blog", de: "Blogbeiträge", ru: "Записи блога" },
+    notices:      { en: "Notices", es: "Avisos", pt: "Avisos", fr: "Annonces", de: "Hinweise", ru: "Объявления" },
+    createPost:   { en: "Create Post", es: "Crear publicación", pt: "Criar publicação", fr: "Créer une publication", de: "Beitrag erstellen", ru: "Создать публикацию" },
+    managePosts:  { en: "Manage Posts", es: "Administrar publicaciones", pt: "Gerenciar publicações", fr: "Gérer les publications", de: "Beiträge verwalten", ru: "Управление публикациями" },
+    changesSaved: { en: "Changes saved successfully.", es: "Los cambios se guardaron correctamente.", pt: "Alterações salvas com sucesso.", fr: "Modifications enregistrées.", de: "Änderungen gespeichert.", ru: "Изменения сохранены." },
 
     /* ── Admin: posts list ── */
-    all:       { en: "All",    pt: "Todos",   es: "Todos",   fr: "Tous",  de: "Alle",  it: "Tutti" },
-    edit:      { en: "Edit",   pt: "Editar",  es: "Editar",  fr: "Modifier", de: "Bearbeiten", it: "Modifica" },
-    delete_:   { en: "Delete", pt: "Excluir", es: "Eliminar", fr: "Supprimer", de: "L\u00f6schen", it: "Elimina" },
-    deletePostConfirm: { en: "Delete this post?", pt: "Excluir esta publica\u00e7\u00e3o?", es: "\u00bfEliminar esta publicaci\u00f3n?", fr: "Supprimer cette publication\u00a0?", de: "Diesen Beitrag l\u00f6schen?", it: "Eliminare questo articolo?" },
-    editor:    { en: "Editor", pt: "Editor",  es: "Editor",  fr: "\u00c9diteur", de: "Editor", it: "Editor" },
+    all:     { en: "All", es: "Todas", pt: "Todas", fr: "Toutes", de: "Alle", ru: "Все" },
+    edit:    { en: "Edit", es: "Editar", pt: "Editar", fr: "Modifier", de: "Bearbeiten", ru: "Изменить" },
+    delete_: { en: "Delete", es: "Eliminar", pt: "Excluir", fr: "Supprimer", de: "Löschen", ru: "Удалить" },
+    deletePostConfirm:  { en: "Delete this post?", es: "¿Eliminar esta publicación?", pt: "Excluir esta publicação?", fr: "Supprimer cette publication" + NNBSP + "?", de: "Diesen Beitrag löschen?", ru: "Удалить эту публикацию?" },
+    deletePostQuestion: {
+      en: "Are you sure you want to delete this post?",
+      es: "¿Seguro que quieres eliminar esta publicación?",
+      pt: "Tem certeza de que deseja excluir esta publicação?",
+      fr: "Voulez-vous vraiment supprimer cette publication" + NNBSP + "?",
+      de: "Möchten Sie diesen Beitrag wirklich löschen?",
+      ru: "Вы уверены, что хотите удалить эту публикацию?"
+    },
+    editor:  { en: "Editor", es: "Editor", pt: "Editor", fr: "Éditeur", de: "Editor", ru: "Редактор" },
+    pdf:     { en: "PDF", es: "PDF", pt: "PDF", fr: "PDF", de: "PDF", ru: "PDF" },
+    viewsCount: {
+      en: { one: "{n} view", other: "{n} views" },
+      es: { one: "{n} visita", other: "{n} visitas" },
+      pt: { one: "{n} visualização", other: "{n} visualizações" },
+      fr: { one: "{n} vue", other: "{n} vues" },
+      de: { one: "{n} Aufruf", other: "{n} Aufrufe" },
+      ru: { one: "{n} просмотр", few: "{n} просмотра", many: "{n} просмотров", other: "{n} просмотра" }
+    },
+    sharesCount: {
+      en: { one: "{n} share", other: "{n} shares" },
+      es: { one: "compartida {n} vez", other: "compartida {n} veces" },
+      pt: { one: "{n} compartilhamento", other: "{n} compartilhamentos" },
+      fr: { one: "{n} partage", other: "{n} partages" },
+      de: { one: "{n}-mal geteilt", other: "{n}-mal geteilt" },
+      ru: { one: "{n} репост", few: "{n} репоста", many: "{n} репостов", other: "{n} репоста" }
+    },
 
     /* ── Admin: post form ── */
-    editPost:    { en: "Edit Post",     pt: "Editar Publica\u00e7\u00e3o", es: "Editar Publicaci\u00f3n", fr: "Modifier la Publication", de: "Beitrag bearbeiten", it: "Modifica Articolo" },
-    type:        { en: "Type",          pt: "Tipo",             es: "Tipo",             fr: "Type",            de: "Typ",              it: "Tipo" },
-    choose:      { en: "Choose\u2026",  pt: "Escolha\u2026",    es: "Elegir\u2026",     fr: "Choisir\u2026",   de: "W\u00e4hlen\u2026", it: "Scegli\u2026" },
-    postDate:    { en: "Post date",     pt: "Data da publica\u00e7\u00e3o", es: "Fecha de publicaci\u00f3n", fr: "Date de publication", de: "Ver\u00f6ffentlichungsdatum", it: "Data di pubblicazione" },
-    title:       { en: "Title",         pt: "T\u00edtulo",      es: "T\u00edtulo",      fr: "Titre",           de: "Titel",            it: "Titolo" },
-    contentMode: { en: "Content mode",  pt: "Modo de conte\u00fado", es: "Modo de contenido", fr: "Mode de contenu", de: "Inhaltsmodus", it: "Modalit\u00e0 contenuto" },
-    pdfUpload:   { en: "PDF Upload",    pt: "Upload de PDF",    es: "Subir PDF",        fr: "T\u00e9l\u00e9charger PDF", de: "PDF hochladen", it: "Carica PDF" },
-    regenSlug:   { en: "Regenerate URL slug", pt: "Regenerar slug da URL", es: "Regenerar slug de URL", fr: "Reg\u00e9n\u00e9rer le slug URL", de: "URL-Slug neu generieren", it: "Rigenera slug URL" },
-    updateUrlOnTitleChange: { en: "Update URL when title changes", pt: "Atualizar URL quando o t\u00edtulo mudar", es: "Actualizar URL cuando cambie el t\u00edtulo", fr: "Mettre \u00e0 jour l\u2019URL quand le titre change", de: "URL bei Titel\u00e4nderung aktualisieren", it: "Aggiorna URL quando il titolo cambia" },
-    postContent: { en: "Post content",  pt: "Conte\u00fado da publica\u00e7\u00e3o", es: "Contenido de la publicaci\u00f3n", fr: "Contenu de la publication", de: "Beitragsinhalt", it: "Contenuto dell'articolo" },
-    pdfFile:     { en: "PDF file",      pt: "Arquivo PDF",      es: "Archivo PDF",      fr: "Fichier PDF",     de: "PDF-Datei",        it: "File PDF" },
+    editPost:    { en: "Edit Post", es: "Editar publicación", pt: "Editar publicação", fr: "Modifier la publication", de: "Beitrag bearbeiten", ru: "Редактировать публикацию" },
+    type:        { en: "Type", es: "Tipo", pt: "Tipo", fr: "Type", de: "Typ", ru: "Тип" },
+    choose:      { en: "Choose…", es: "Elegir…", pt: "Selecione…", fr: "Choisir…", de: "Auswählen…", ru: "Выберите…" },
+    postDate:    { en: "Post date", es: "Fecha de publicación", pt: "Data de publicação", fr: "Date de publication", de: "Veröffentlichungsdatum", ru: "Дата публикации" },
+    title:       { en: "Title", es: "Título", pt: "Título", fr: "Titre", de: "Titel", ru: "Заголовок" },
+    contentMode: { en: "Content mode", es: "Modo de contenido", pt: "Modo de conteúdo", fr: "Mode de contenu", de: "Inhaltsmodus", ru: "Режим содержимого" },
+    pdfUpload:   { en: "PDF Upload", es: "Subir PDF", pt: "Enviar PDF", fr: "Importer un PDF", de: "PDF hochladen", ru: "Загрузка PDF" },
+    regenSlug:   { en: "Regenerate URL slug", es: "Regenerar el slug de la URL", pt: "Regenerar o slug da URL", fr: "Régénérer le slug de l’URL", de: "URL-Slug neu erzeugen", ru: "Пересоздать адрес (slug)" },
+    updateUrlOnTitleChange: { en: "Update URL when title changes", es: "Actualizar la URL cuando cambie el título", pt: "Atualizar a URL quando o título mudar", fr: "Mettre à jour l’URL quand le titre change", de: "URL bei Titeländerung aktualisieren", ru: "Обновлять адрес при изменении заголовка" },
+    postContent: { en: "Post content", es: "Contenido de la publicación", pt: "Conteúdo da publicação", fr: "Contenu de la publication", de: "Beitragsinhalt", ru: "Текст публикации" },
+    pdfFile:     { en: "PDF file", es: "Archivo PDF", pt: "Arquivo PDF", fr: "Fichier PDF", de: "PDF-Datei", ru: "Файл PDF" },
     pdfUploadHint: {
       en: "Upload a PDF. Text will be extracted and placed into an editor below for formatting.",
-      pt: "Envie um PDF. O texto ser\u00e1 extra\u00eddo e colocado no editor abaixo para formata\u00e7\u00e3o.",
-      es: "Sube un PDF. El texto se extraer\u00e1 y se colocar\u00e1 en el editor a continuaci\u00f3n para su formato.",
-      fr: "T\u00e9l\u00e9chargez un PDF. Le texte sera extrait et plac\u00e9 dans l\u2019\u00e9diteur ci-dessous pour la mise en forme.",
-      de: "Laden Sie ein PDF hoch. Der Text wird extrahiert und im Editor unten zur Formatierung eingef\u00fcgt.",
-      it: "Carica un PDF. Il testo verr\u00e0 estratto e inserito nell'editor sottostante per la formattazione."
+      es: "Sube un PDF. El texto se extraerá y se colocará en el editor de abajo para darle formato.",
+      pt: "Envie um PDF. O texto será extraído e colocado no editor abaixo para formatação.",
+      fr: "Importez un PDF. Le texte sera extrait et placé dans l’éditeur ci-dessous pour la mise en forme.",
+      de: "Laden Sie ein PDF hoch. Der Text wird extrahiert und zur Formatierung in den Editor unten eingefügt.",
+      ru: "Загрузите PDF. Текст будет извлечён и помещён в редактор ниже для оформления."
     },
-    extractedContent: { en: "Extracted content (edit below)", pt: "Conte\u00fado extra\u00eddo (edite abaixo)", es: "Contenido extra\u00eddo (editar abajo)", fr: "Contenu extrait (modifier ci-dessous)", de: "Extrahierter Inhalt (unten bearbeiten)", it: "Contenuto estratto (modifica sotto)" },
+    extractedContent: { en: "Extracted content (edit below)", es: "Contenido extraído (edítalo abajo)", pt: "Conteúdo extraído (edite abaixo)", fr: "Contenu extrait (modifiable ci-dessous)", de: "Extrahierter Inhalt (unten bearbeiten)", ru: "Извлечённый текст (редактируйте ниже)" },
     formatExtractedText: {
       en: "Format the extracted text using the toolbar above. This will be saved as the post content.",
-      pt: "Formate o texto extra\u00eddo usando a barra de ferramentas acima. Isto ser\u00e1 salvo como conte\u00fado da publica\u00e7\u00e3o.",
-      es: "Formatea el texto extra\u00eddo usando la barra de herramientas de arriba. Esto se guardar\u00e1 como contenido de la publicaci\u00f3n.",
-      fr: "Mettez en forme le texte extrait \u00e0 l\u2019aide de la barre d\u2019outils ci-dessus. Il sera enregistr\u00e9 comme contenu de la publication.",
-      de: "Formatieren Sie den extrahierten Text mit der Symbolleiste oben. Dieser wird als Beitragsinhalt gespeichert.",
-      it: "Formatta il testo estratto utilizzando la barra degli strumenti sopra. Verr\u00e0 salvato come contenuto dell'articolo."
+      es: "Da formato al texto extraído con la barra de herramientas de arriba. Se guardará como contenido de la publicación.",
+      pt: "Formate o texto extraído usando a barra de ferramentas acima. Ele será salvo como conteúdo da publicação.",
+      fr: "Mettez en forme le texte extrait à l’aide de la barre d’outils ci-dessus. Il sera enregistré comme contenu de la publication.",
+      de: "Formatieren Sie den extrahierten Text mit der Symbolleiste oben. Er wird als Beitragsinhalt gespeichert.",
+      ru: "Отформатируйте извлечённый текст с помощью панели инструментов выше. Он будет сохранён как текст публикации."
     },
     autoTranslateTitle: {
       en: "Auto Translation for Title",
-      pt: "Tradu\u00e7\u00e3o Autom\u00e1tica do T\u00edtulo",
-      es: "Traducci\u00f3n Autom\u00e1tica del T\u00edtulo",
-      fr: "Traduction Automatique du Titre",
-      de: "Automatische Titel\u00fcbersetzung",
-      it: "Traduzione Automatica del Titolo"
+      es: "Traducción automática del título",
+      pt: "Tradução automática do título",
+      fr: "Traduction automatique du titre",
+      de: "Automatische Übersetzung des Titels",
+      ru: "Автоматический перевод заголовка"
     },
-    save:     { en: "Save",   pt: "Salvar",    es: "Guardar",    fr: "Enregistrer",  de: "Speichern",  it: "Salva" },
-    cancel:   { en: "Cancel", pt: "Cancelar",  es: "Cancelar",   fr: "Annuler",      de: "Abbrechen",  it: "Annulla" },
-    required: { en: "Required", pt: "Obrigat\u00f3rio", es: "Obligatorio", fr: "Obligatoire", de: "Erforderlich", it: "Obbligatorio" },
+    save:     { en: "Save", es: "Guardar", pt: "Salvar", fr: "Enregistrer", de: "Speichern", ru: "Сохранить" },
+    cancel:   { en: "Cancel", es: "Cancelar", pt: "Cancelar", fr: "Annuler", de: "Abbrechen", ru: "Отмена" },
+    required: { en: "Required", es: "Obligatorio", pt: "Obrigatório", fr: "Obligatoire", de: "Erforderlich", ru: "Обязательное поле" },
     requiredEditorMode: {
       en: "Required in Editor mode",
-      pt: "Obrigat\u00f3rio no modo Editor",
-      es: "Obligatorio en modo Editor",
-      fr: "Obligatoire en mode \u00c9diteur",
-      de: "Erforderlich im Editor-Modus",
-      it: "Obbligatorio in modalit\u00e0 Editor"
+      es: "Obligatorio en el modo Editor",
+      pt: "Obrigatório no modo Editor",
+      fr: "Obligatoire en mode Éditeur",
+      de: "Im Editor-Modus erforderlich",
+      ru: "Обязательно в режиме редактора"
+    },
+    errChooseType:      { en: "Choose a post type.", es: "Elige un tipo de publicación.", pt: "Escolha um tipo de publicação.", fr: "Choisissez un type de publication.", de: "Wählen Sie einen Beitragstyp.", ru: "Выберите тип публикации." },
+    errTitleRequired:   { en: "Title is required.", es: "El título es obligatorio.", pt: "O título é obrigatório.", fr: "Le titre est obligatoire.", de: "Ein Titel ist erforderlich.", ru: "Укажите заголовок." },
+    errInvalidDate:     { en: "Invalid date.", es: "Fecha no válida.", pt: "Data inválida.", fr: "Date non valide.", de: "Ungültiges Datum.", ru: "Неверная дата." },
+    errPdfRequired:     { en: "PDF file is required for PDF mode.", es: "En el modo PDF se necesita un archivo PDF.", pt: "No modo PDF é necessário um arquivo PDF.", fr: "Un fichier PDF est requis en mode PDF.", de: "Im PDF-Modus ist eine PDF-Datei erforderlich.", ru: "В режиме PDF нужен файл PDF." },
+    errContentRequired: { en: "Content is required in editor mode.", es: "El contenido es obligatorio en el modo Editor.", pt: "O conteúdo é obrigatório no modo Editor.", fr: "Le contenu est obligatoire en mode Éditeur.", de: "Im Editor-Modus ist Inhalt erforderlich.", ru: "В режиме редактора нужен текст публикации." },
+    errSaveFailed:      { en: "The post could not be saved. Please try again.", es: "No se pudo guardar la publicación. Inténtalo de nuevo.", pt: "Não foi possível salvar a publicação. Tente novamente.", fr: "La publication n’a pas pu être enregistrée. Veuillez réessayer.", de: "Der Beitrag konnte nicht gespeichert werden. Bitte versuchen Sie es erneut.", ru: "Не удалось сохранить публикацию. Попробуйте ещё раз." },
+    pdfExtracting:       { en: "Extracting text from PDF…", es: "Extrayendo el texto del PDF…", pt: "Extraindo o texto do PDF…", fr: "Extraction du texte du PDF…", de: "Text wird aus dem PDF extrahiert…", ru: "Извлечение текста из PDF…" },
+    pdfExtracted:        { en: "Text extracted. Edit the content below.", es: "Texto extraído. Edita el contenido abajo.", pt: "Texto extraído. Edite o conteúdo abaixo.", fr: "Texte extrait. Modifiez le contenu ci-dessous.", de: "Text extrahiert. Bearbeiten Sie den Inhalt unten.", ru: "Текст извлечён. Отредактируйте его ниже." },
+    pdfReplacedKeptText: { en: "PDF replaced. Existing content preserved.", es: "PDF reemplazado. Se conservó el contenido existente.", pt: "PDF substituído. O conteúdo existente foi mantido.", fr: "PDF remplacé. Le contenu existant a été conservé.", de: "PDF ersetzt. Der vorhandene Inhalt wurde beibehalten.", ru: "PDF заменён. Текущий текст сохранён." },
+    pdfExtractFailed:    { en: "Failed to extract PDF text. Please try again.", es: "No se pudo extraer el texto del PDF. Inténtalo de nuevo.", pt: "Não foi possível extrair o texto do PDF. Tente novamente.", fr: "Impossible d’extraire le texte du PDF. Veuillez réessayer.", de: "Der Text konnte nicht aus dem PDF extrahiert werden. Bitte versuchen Sie es erneut.", ru: "Не удалось извлечь текст из PDF. Попробуйте ещё раз." },
+    pdfNoText:           { en: "No selectable text was found in this PDF.", es: "No se encontró texto seleccionable en este PDF.", pt: "Nenhum texto selecionável foi encontrado neste PDF.", fr: "Aucun texte sélectionnable n’a été trouvé dans ce PDF.", de: "In diesem PDF wurde kein markierbarer Text gefunden.", ru: "В этом PDF не найден текст, который можно выделить." },
+    pdfNotPdf:           { en: "Only PDF files can be uploaded.", es: "Solo se pueden subir archivos PDF.", pt: "Somente arquivos PDF podem ser enviados.", fr: "Seuls les fichiers PDF peuvent être importés.", de: "Es können nur PDF-Dateien hochgeladen werden.", ru: "Можно загружать только файлы PDF." },
+    pdfTooLarge:         { en: "The PDF is larger than 15 MB.", es: "El PDF supera los 15 MB.", pt: "O PDF tem mais de 15 MB.", fr: "Le PDF dépasse 15" + NNBSP + "Mo.", de: "Das PDF ist größer als 15 MB.", ru: "Размер PDF превышает 15 МБ." },
+    confirmSwitchToEditor: {
+      en: "Switching to Editor mode removes the original PDF from this post when you save. Continue?",
+      es: "Al cambiar al modo Editor, el PDF original se quitará de esta publicación cuando guardes. ¿Continuar?",
+      pt: "Ao mudar para o modo Editor, o PDF original será removido desta publicação quando você salvar. Continuar?",
+      fr: "Si vous passez en mode Éditeur, le PDF original sera retiré de cette publication à l’enregistrement. Continuer" + NNBSP + "?",
+      de: "Beim Wechsel in den Editor-Modus wird das Original-PDF beim Speichern aus diesem Beitrag entfernt. Fortfahren?",
+      ru: "При переключении в режим редактора исходный PDF будет удалён из публикации после сохранения. Продолжить?"
     },
 
     /* ── Admin: site settings ── */
-    homePageText:  { en: "Home Page Text",       pt: "Texto da P\u00e1gina Inicial", es: "Texto de la P\u00e1gina de Inicio", fr: "Texte de la Page d\u2019Accueil", de: "Startseitentext", it: "Testo della Pagina Iniziale" },
-    noticesMax3:   { en: "Notices (max 3)",       pt: "Avisos (m\u00e1x 3)",         es: "Avisos (m\u00e1x 3)",               fr: "Avis (max 3)",                    de: "Hinweise (max 3)",  it: "Avvisi (max 3)" },
-    addNotice:     { en: "Add Notice",            pt: "Adicionar Aviso",              es: "Agregar Aviso",                     fr: "Ajouter un Avis",                 de: "Hinweis hinzuf\u00fcgen", it: "Aggiungi Avviso" },
-    addNoticePlaceholder: { en: "Add a notice\u2026", pt: "Adicionar um aviso\u2026", es: "Agregar un aviso\u2026",          fr: "Ajouter un avis\u2026",            de: "Hinweis hinzuf\u00fcgen\u2026", it: "Aggiungi un avviso\u2026" },
+    homePageText: { en: "Home Page Text", es: "Texto de la página de inicio", pt: "Texto da página inicial", fr: "Texte de la page d’accueil", de: "Text der Startseite", ru: "Текст главной страницы" },
+    noticesMax3:  { en: "Notices (max 3)", es: "Avisos (máx. 3)", pt: "Avisos (máx. 3)", fr: "Annonces (3" + NNBSP + "max.)", de: "Hinweise (max. 3)", ru: "Объявления (не более 3)" },
+    addNotice:    { en: "Add Notice", es: "Añadir aviso", pt: "Adicionar aviso", fr: "Ajouter une annonce", de: "Hinweis hinzufügen", ru: "Добавить объявление" },
+    addNoticePlaceholder: { en: "Add a notice…", es: "Escribe un aviso…", pt: "Escreva um aviso…", fr: "Saisissez une annonce…", de: "Hinweis eingeben…", ru: "Введите объявление…" },
     maxNoticesReached: {
       en: "Maximum of 3 notices reached.",
-      pt: "M\u00e1ximo de 3 avisos atingido.",
-      es: "Se alcanz\u00f3 el m\u00e1ximo de 3 avisos.",
-      fr: "Maximum de 3 avis atteint.",
-      de: "Maximum von 3 Hinweisen erreicht.",
-      it: "Massimo di 3 avvisi raggiunto."
+      es: "Se alcanzó el máximo de 3 avisos.",
+      pt: "O limite de 3 avisos foi atingido.",
+      fr: "Le maximum de 3 annonces est atteint.",
+      de: "Die Höchstzahl von 3 Hinweisen ist erreicht.",
+      ru: "Достигнуто максимальное число объявлений (3)."
     },
-    deleteNoticeConfirm: { en: "Delete this notice?", pt: "Excluir este aviso?", es: "\u00bfEliminar este aviso?", fr: "Supprimer cet avis\u00a0?", de: "Diesen Hinweis l\u00f6schen?", it: "Eliminare questo avviso?" },
+    deleteNoticeConfirm: { en: "Delete this notice?", es: "¿Eliminar este aviso?", pt: "Excluir este aviso?", fr: "Supprimer cette annonce" + NNBSP + "?", de: "Diesen Hinweis löschen?", ru: "Удалить это объявление?" },
 
     /* ── Subscribe ── */
-    subscribe: {
-      en: "Subscribe", pt: "Inscrever-se", es: "Suscribirse",
-      fr: "S'abonner", de: "Abonnieren", it: "Iscriviti"
-    },
+    subscribe: { en: "Subscribe", es: "Suscribirse", pt: "Inscrever-se", fr: "S’abonner", de: "Abonnieren", ru: "Подписаться" },
     stayUpdated: {
       en: "Stay updated on our latest posts?",
-      pt: "Fique atualizado sobre nossas \u00faltimas publica\u00e7\u00f5es?",
-      es: "\u00bfMant\u00e9nte al d\u00eda con nuestras \u00faltimas publicaciones?",
-      fr: "Restez inform\u00e9 de nos derni\u00e8res publications\u00a0?",
-      de: "Bleiben Sie \u00fcber unsere neuesten Beitr\u00e4ge auf dem Laufenden?",
-      it: "Resta aggiornato sui nostri ultimi articoli?"
+      es: "¿Quieres estar al día con nuestras últimas publicaciones?",
+      pt: "Quer ficar por dentro das nossas últimas publicações?",
+      fr: "Vous souhaitez être informé de nos dernières publications" + NNBSP + "?",
+      de: "Möchten Sie über unsere neuesten Beiträge informiert bleiben?",
+      ru: "Хотите узнавать о наших новых публикациях?"
     },
     enterEmail: {
       en: "Enter your email address",
-      pt: "Digite seu endere\u00e7o de email",
-      es: "Ingresa tu correo electr\u00f3nico",
-      fr: "Entrez votre adresse e-mail",
+      es: "Introduce tu correo electrónico",
+      pt: "Digite seu endereço de e-mail",
+      fr: "Saisissez votre adresse e-mail",
       de: "Geben Sie Ihre E-Mail-Adresse ein",
-      it: "Inserisci il tuo indirizzo email"
+      ru: "Введите адрес электронной почты"
     },
     invalidEmail: {
       en: "Invalid email",
-      pt: "Email inv\u00e1lido",
-      es: "Correo electr\u00f3nico no v\u00e1lido",
-      fr: "E-mail invalide",
-      de: "Ung\u00fcltige E-Mail",
-      it: "Email non valida"
+      es: "Correo electrónico no válido",
+      pt: "E-mail inválido",
+      fr: "Adresse e-mail non valide",
+      de: "Ungültige E-Mail-Adresse",
+      ru: "Неверный адрес электронной почты"
     },
     alreadySubscribed: {
       en: "Oops! You are already subscribed",
-      pt: "Ops! Voc\u00ea j\u00e1 est\u00e1 inscrito",
-      es: "\u00a1Ups! Ya est\u00e1s suscrito",
-      fr: "Oups\u00a0! Vous \u00eates d\u00e9j\u00e0 abonn\u00e9",
-      de: "Hoppla! Sie sind bereits abonniert",
-      it: "Ops! Sei gi\u00e0 iscritto"
+      es: "¡Vaya! Ya estás suscrito",
+      pt: "Ops! Você já está inscrito",
+      fr: "Oups" + NNBSP + "! Vous êtes déjà abonné",
+      de: "Hoppla! Sie haben bereits ein Abonnement",
+      ru: "Ой! Вы уже подписаны"
     },
     subscribeThankYou: {
       en: "Thank you for subscribing to The Augustine Journal. You may unsubscribe at any time in your email.",
-      pt: "Obrigado por se inscrever no The Augustine Journal. Voc\u00ea pode cancelar sua inscri\u00e7\u00e3o a qualquer momento em seu email.",
-      es: "Gracias por suscribirte a The Augustine Journal. Puedes cancelar tu suscripci\u00f3n en cualquier momento desde tu correo.",
-      fr: "Merci de vous \u00eatre abonn\u00e9 \u00e0 The Augustine Journal. Vous pouvez vous d\u00e9sabonner \u00e0 tout moment dans votre e-mail.",
-      de: "Vielen Dank f\u00fcr Ihr Abonnement des The Augustine Journal. Sie k\u00f6nnen sich jederzeit in Ihrer E-Mail abmelden.",
-      it: "Grazie per esserti iscritto a The Augustine Journal. Puoi annullare l'iscrizione in qualsiasi momento dalla tua email."
+      es: "Gracias por suscribirte al Diario Agustiniano. Puedes cancelar tu suscripción en cualquier momento desde nuestros correos.",
+      pt: "Obrigado por se inscrever no Diário Agostiniano. Você pode cancelar sua inscrição a qualquer momento pelos nossos e-mails.",
+      fr: "Merci de vous être abonné au Journal augustinien. Vous pouvez vous désabonner à tout moment depuis nos e-mails.",
+      de: "Vielen Dank für Ihr Abonnement des Augustinischen Journals. Sie können es jederzeit über den Link in unseren E-Mails beenden.",
+      ru: "Спасибо за подписку на «Августинский журнал». Отписаться можно в любой момент по ссылке в наших письмах."
     },
+    subscribed: { en: "Subscribed!", es: "¡Suscrito!", pt: "Inscrito!", fr: "Abonné" + NNBSP + "!", de: "Abonniert!", ru: "Вы подписаны!" },
 
     /* ── Admin: subscribers ── */
-    subscribers: {
-      en: "Subscribers", pt: "Inscritos", es: "Suscriptores",
-      fr: "Abonn\u00e9s", de: "Abonnenten", it: "Iscritti"
-    },
+    subscribers: { en: "Subscribers", es: "Suscriptores", pt: "Inscritos", fr: "Abonnés", de: "Abonnenten", ru: "Подписчики" },
     subscriberCount: {
-      en: "subscriber(s)", pt: "inscrito(s)", es: "suscriptor(es)",
-      fr: "abonn\u00e9(s)", de: "Abonnent(en)", it: "iscritto/i"
+      en: { one: "{n} subscriber", other: "{n} subscribers" },
+      es: { one: "{n} suscriptor", other: "{n} suscriptores" },
+      pt: { one: "{n} inscrito", other: "{n} inscritos" },
+      fr: { one: "{n} abonné", other: "{n} abonnés" },
+      de: { one: "{n} Abonnent", other: "{n} Abonnenten" },
+      ru: { one: "{n} подписчик", few: "{n} подписчика", many: "{n} подписчиков", other: "{n} подписчика" }
     },
     noSubscribers: {
       en: "No subscribers yet.",
-      pt: "Nenhum inscrito ainda.",
-      es: "No hay suscriptores todav\u00eda.",
-      fr: "Aucun abonn\u00e9 pour le moment.",
+      es: "Todavía no hay suscriptores.",
+      pt: "Ainda não há inscritos.",
+      fr: "Aucun abonné pour le moment.",
       de: "Noch keine Abonnenten.",
-      it: "Nessun iscritto ancora."
+      ru: "Подписчиков пока нет."
     },
-
-    /* ── Admin: unsubscribe ── */
-    unsubscribe: {
-      en: "Unsubscribe", pt: "Cancelar inscri\u00e7\u00e3o", es: "Cancelar suscripci\u00f3n",
-      fr: "D\u00e9sabonner", de: "Abmelden", it: "Annulla iscrizione"
+    unsubscribe: { en: "Unsubscribe", es: "Cancelar suscripción", pt: "Cancelar inscrição", fr: "Désabonner", de: "Abonnement beenden", ru: "Отписать" },
+    removeSubscriberConfirm: {
+      en: "Are you sure you want to remove {email} from subscribers?",
+      es: "¿Seguro que quieres eliminar a {email} de los suscriptores?",
+      pt: "Tem certeza de que deseja remover {email} dos inscritos?",
+      fr: "Voulez-vous vraiment retirer {email} des abonnés" + NNBSP + "?",
+      de: "Möchten Sie {email} wirklich aus der Abonnentenliste entfernen?",
+      ru: "Вы уверены, что хотите удалить {email} из подписчиков?"
     },
-    confirm: {
-      en: "Confirm", pt: "Confirmar", es: "Confirmar",
-      fr: "Confirmer", de: "Best\u00e4tigen", it: "Conferma"
-    },
+    confirm: { en: "Confirm", es: "Confirmar", pt: "Confirmar", fr: "Confirmer", de: "Bestätigen", ru: "Подтвердить" },
     enterAdminPassword: {
       en: "Please enter administrative password",
-      pt: "Por favor, insira a senha administrativa",
-      es: "Por favor, ingrese la contrase\u00f1a administrativa",
-      fr: "Veuillez entrer le mot de passe administratif",
-      de: "Bitte geben Sie das Administratorkennwort ein",
-      it: "Inserisci la password amministrativa"
+      es: "Introduce la contraseña de administrador",
+      pt: "Digite a senha de administrador",
+      fr: "Veuillez saisir le mot de passe administrateur",
+      de: "Bitte geben Sie das Administratorpasswort ein",
+      ru: "Введите пароль администратора"
     },
     incorrectPassword: {
       en: "Incorrect password.",
+      es: "Contraseña incorrecta.",
       pt: "Senha incorreta.",
-      es: "Contrase\u00f1a incorrecta.",
       fr: "Mot de passe incorrect.",
       de: "Falsches Passwort.",
-      it: "Password errata."
+      ru: "Неверный пароль."
     },
-
-    /* ── Subscribe success ── */
-    subscribed: {
-      en: "Subscribed!", pt: "Inscrito!", es: "\u00a1Suscrito!",
-      fr: "Abonn\u00e9\u00a0!", de: "Abonniert!", it: "Iscritto!"
+    sessionExpired: {
+      en: "Your session has expired. Please sign in again.",
+      es: "Tu sesión ha caducado. Vuelve a iniciar sesión.",
+      pt: "Sua sessão expirou. Entre novamente.",
+      fr: "Votre session a expiré. Veuillez vous reconnecter.",
+      de: "Ihre Sitzung ist abgelaufen. Bitte melden Sie sich erneut an.",
+      ru: "Сеанс истёк. Войдите снова."
+    },
+    actionFailed: {
+      en: "The action could not be completed. Please try again.",
+      es: "No se pudo completar la acción. Inténtalo de nuevo.",
+      pt: "Não foi possível concluir a ação. Tente novamente.",
+      fr: "L’action n’a pas pu être effectuée. Veuillez réessayer.",
+      de: "Die Aktion konnte nicht ausgeführt werden. Bitte versuchen Sie es erneut.",
+      ru: "Не удалось выполнить действие. Попробуйте ещё раз."
     },
 
     /* ── Site title ── */
     siteTitle: {
       en: "The Augustine Journal",
-      pt: "O Di\u00e1rio Agostiniano",
       es: "El Diario Agustiniano",
-      fr: "Le Journal Augustinien",
+      pt: "O Diário Agostiniano",
+      fr: "Le Journal augustinien",
       de: "Das Augustinische Journal",
-      it: "Il Giornale Agostiniano"
+      ru: "Августинский журнал"
     }
   };
 
   /* ===== Language detection ===== */
 
   /**
-   * Detect best language using both navigator.languages (browser language
-   * settings) and the server-detected language from the Accept-Language
-   * header (passed via a <meta> tag).
+   * The visitor's language: the first supported entry of the browser's
+   * language list, then the server's reading of the Accept-Language header.
    */
   function detectBestLang() {
-    /* 1. Check navigator.languages (ordered by user preference) */
-    var languages = navigator.languages
+    var languages = navigator.languages && navigator.languages.length
       ? Array.prototype.slice.call(navigator.languages)
       : [navigator.language || navigator.userLanguage || "en"];
 
     for (var i = 0; i < languages.length; i++) {
-      var base = languages[i].toLowerCase().split("-")[0];
+      var base = String(languages[i] || "").toLowerCase().split("-")[0];
       if (SUPPORTED.indexOf(base) !== -1) return base;
     }
 
-    /* 2. Fall back to server-detected language from Accept-Language header */
     var meta = document.querySelector('meta[name="detected-lang"]');
     if (meta) {
       var serverLang = (meta.getAttribute("content") || "").toLowerCase().split("-")[0];
       if (SUPPORTED.indexOf(serverLang) !== -1) return serverLang;
     }
 
-    return "en";
+    return SITE_LANG;
   }
 
-  /* ===== Translate static UI labels using built-in dictionaries ===== */
-  function translateUiStrings(lang) {
-    var nodes = document.querySelectorAll("[data-i18n]");
-    for (var i = 0; i < nodes.length; i++) {
-      var el = nodes[i];
+  var lang = SITE_LANG;
+
+  function t(key, fallback) {
+    var map = ui[key];
+    if (!map) return fallback !== undefined ? fallback : key;
+    var value = map[lang] !== undefined ? map[lang] : map.en;
+    return typeof value === "string" ? value : fallback !== undefined ? fallback : key;
+  }
+
+  function format(template, vars) {
+    return String(template).replace(/\{(\w+)\}/g, function (m, name) {
+      return vars && vars[name] !== undefined ? String(vars[name]) : m;
+    });
+  }
+
+  function plural(key, n) {
+    var map = ui[key];
+    if (!map) return String(n);
+    var forms = map[lang] || map.en;
+    var category = "other";
+    try { category = new Intl.PluralRules(LOCALES[lang]).select(n); } catch (e) { category = n === 1 ? "one" : "other"; }
+    var number = n;
+    try { number = new Intl.NumberFormat(LOCALES[lang]).format(n); } catch (e) { /* keep plain */ }
+    return format(forms[category] || forms.other, { n: number });
+  }
+
+  function each(selector, fn) {
+    var nodes = document.querySelectorAll(selector);
+    for (var i = 0; i < nodes.length; i++) fn(nodes[i]);
+  }
+
+  /* ===== Dictionary text, attributes, dates and counts ===== */
+  function translateInterface() {
+    each("[data-i18n]", function (el) {
       var key = el.getAttribute("data-i18n");
-      var map = ui[key];
-      if (!map) continue;
-      el.textContent = map[lang] || map.en;
-    }
-  }
-
-  /* ===== Translate placeholder attributes ===== */
-  function translatePlaceholders(lang) {
-    var nodes = document.querySelectorAll("[data-i18n-placeholder]");
-    for (var i = 0; i < nodes.length; i++) {
-      var el = nodes[i];
+      if (ui[key]) el.textContent = t(key);
+    });
+    each("[data-i18n-placeholder]", function (el) {
       var key = el.getAttribute("data-i18n-placeholder");
-      var map = ui[key];
-      if (!map) continue;
-      el.setAttribute("placeholder", map[lang] || map.en);
-    }
-  }
-
-  /* ===== Translate confirm prompts ===== */
-  function translateConfirmPrompts(lang) {
-    var nodes = document.querySelectorAll("[data-i18n-confirm]");
-    for (var i = 0; i < nodes.length; i++) {
-      var el = nodes[i];
-      var key = el.getAttribute("data-i18n-confirm");
-      var map = ui[key];
-      if (!map) continue;
-      var msg = map[lang] || map.en;
-      el.setAttribute("onsubmit", "return confirm('" + msg.replace(/'/g, "\\'") + "');");
-    }
-  }
-
-  /* ===== Google Translate cookie management ===== */
-  function clearTranslateCookies() {
-    var host = location.hostname;
-    document.cookie = "googtrans=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
-    document.cookie = "googtrans=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=." + host;
-  }
-
-  function setTranslateCookies(lang) {
-    clearTranslateCookies();
-
-    if (lang && lang !== SITE_LANG) {
-      var host = location.hostname;
-      var val = "/en/" + lang;
-      document.cookie = "googtrans=" + val + "; path=/";
-      document.cookie = "googtrans=" + val + "; path=/; domain=." + host;
-    }
-  }
-
-  /* ===== Clean URL hash (Google Translate may append #googtrans) ===== */
-  function cleanUrlHash() {
-    if (location.hash && location.hash.indexOf("googtrans") !== -1) {
-      history.replaceState(null, "", location.pathname + location.search);
-    }
-  }
-
-  /* ===== Programmatically trigger Google Translate ===== */
-  function triggerGoogleTranslate(lang) {
-    var attempts = 0;
-    var maxAttempts = 80;
-    var interval = setInterval(function () {
-      attempts++;
-      var combo = document.querySelector(".goog-te-combo");
-      if (combo) {
-        clearInterval(interval);
-        combo.value = lang;
-        combo.dispatchEvent(new Event("change"));
-        /* Repeatedly hide the Google Translate banner */
-        setTimeout(hideGoogleTranslateBanner, 300);
-        setTimeout(hideGoogleTranslateBanner, 1000);
-        setTimeout(hideGoogleTranslateBanner, 3000);
+      if (ui[key]) el.setAttribute("placeholder", t(key));
+    });
+    each("[data-i18n-aria-label]", function (el) {
+      var key = el.getAttribute("data-i18n-aria-label");
+      if (ui[key]) el.setAttribute("aria-label", t(key));
+    });
+    each("[data-i18n-title]", function (el) {
+      var key = el.getAttribute("data-i18n-title");
+      if (ui[key]) el.setAttribute("title", t(key));
+    });
+    each("[data-i18n-template]", function (el) {
+      var key = el.getAttribute("data-i18n-template");
+      if (!ui[key]) return;
+      var vars = {};
+      for (var i = 0; i < el.attributes.length; i++) {
+        var a = el.attributes[i];
+        if (a.name.indexOf("data-var-") === 0) vars[a.name.slice(9)] = a.value;
       }
-      if (attempts >= maxAttempts) {
-        clearInterval(interval);
+      el.textContent = format(t(key), vars);
+    });
+    each("[data-i18n-count]", function (el) {
+      var n = Number(el.getAttribute("data-count"));
+      if (!isNaN(n)) el.textContent = plural(el.getAttribute("data-i18n-count"), n);
+    });
+    each("time[data-i18n-date]", function (el) {
+      var iso = el.getAttribute("datetime");
+      if (!iso) return;
+      var date = new Date(iso.length === 10 ? iso + "T00:00:00Z" : iso);
+      if (isNaN(date.getTime())) return;
+      var style = el.getAttribute("data-i18n-date") === "short" ? "short" : "long";
+      try {
+        el.textContent = new Intl.DateTimeFormat(LOCALES[lang], { year: "numeric", month: style, day: "numeric", timeZone: "UTC" }).format(date);
+      } catch (e) { /* keep the English date */ }
+    });
+  }
+
+  /* Confirmation prompts on forms (inline handlers are blocked by the CSP). */
+  function wireConfirmPrompts() {
+    each("form[data-i18n-confirm]", function (form) {
+      form.addEventListener("submit", function (e) {
+        if (!window.confirm(t(form.getAttribute("data-i18n-confirm")))) e.preventDefault();
+      });
+    });
+  }
+
+  /* ===== Document title ===== */
+  function updateDocumentTitle() {
+    var root = document.documentElement;
+    var site = t("siteTitle");
+    var from = root.getAttribute("data-title-from");
+    var key = root.getAttribute("data-title-key");
+    if (from) {
+      var el = document.querySelector(from);
+      if (el && el.textContent.trim()) document.title = el.textContent.trim() + " | " + site;
+    } else if (key === "siteTitle") {
+      document.title = site;
+    } else if (key && ui[key]) {
+      document.title = t(key) + " | " + site;
+    }
+  }
+
+  /* ===== Content from the translation engine ===== */
+  var applied = {};
+  var pollTimer = null;
+  var pollDelay = 2500;
+  var pollUntil = 0;
+
+  function revealPage() {
+    document.documentElement.classList.remove("i18n-pending");
+  }
+
+  function translatableElements() {
+    var byKey = {};
+    each("[data-translate-key]", function (el) {
+      var key = el.getAttribute("data-translate-key");
+      if (!key || el.closest("[translate='no'], .notranslate")) return;
+      (byKey[key] = byKey[key] || []).push(el);
+    });
+    return byKey;
+  }
+
+  function applyItem(els, item) {
+    for (var i = 0; i < els.length; i++) {
+      var el = els[i];
+      var kind = el.getAttribute("data-translate-kind") || "text";
+      if (kind === "html" && typeof item.html === "string") {
+        if (applied[el.getAttribute("data-translate-key")] !== item.html || el.getAttribute("data-translated") !== "1") {
+          el.innerHTML = item.html;
+          el.setAttribute("data-translated", "1");
+        }
+      } else if (kind === "text" && typeof item.text === "string") {
+        el.textContent = item.text;
+        el.setAttribute("data-translated", "1");
       }
-    }, 100);
-  }
-
-  function hideGoogleTranslateBanner() {
-    /* Hide the top banner/frame that Google Translate injects */
-    var frames = document.querySelectorAll(".goog-te-banner-frame");
-    for (var i = 0; i < frames.length; i++) {
-      frames[i].style.display = "none";
-    }
-    /* Ensure body stays at top (Google Translate pushes it down) */
-    document.body.style.top = "0px";
-  }
-
-  /* ===== Initialize Google Translate Element ===== */
-  function initGoogleTranslate(lang) {
-    if (lang === SITE_LANG) return;
-
-    setTranslateCookies(lang);
-
-    /* Create the container div if it does not exist (admin pages) */
-    if (!document.getElementById("google_translate_element")) {
-      var gtDiv = document.createElement("div");
-      gtDiv.id = "google_translate_element";
-      document.body.insertBefore(gtDiv, document.body.firstChild);
-    }
-
-    window.googleTranslateElementInit = function () {
-      new google.translate.TranslateElement(
-        {
-          pageLanguage: "en",
-          autoDisplay: false,
-          layout: google.translate.TranslateElement.InlineLayout.SIMPLE
-        },
-        "google_translate_element"
-      );
-
-      /* Programmatically trigger the target language */
-      triggerGoogleTranslate(lang);
-    };
-
-    var script = document.createElement("script");
-    script.src =
-      "https://translate.google.com/translate_a/element.js?cb=googleTranslateElementInit";
-    script.async = true;
-    script.onerror = function () {
-      console.warn("[i18n] Google Translate failed to load. Content will remain in English.");
-    };
-    document.head.appendChild(script);
-  }
-
-  /* ===== Translate dynamic content via the server API endpoint ===== */
-  function translateDynamicContent(lang) {
-    if (lang === SITE_LANG) return;
-
-    var nodes = document.querySelectorAll("[data-translate='content']");
-    if (!nodes.length) return;
-
-    for (var i = 0; i < nodes.length; i++) {
-      (function (node) {
-        var original = node.getAttribute("data-original") || "";
-        if (!original.trim()) return;
-
-        fetch("/api/translate", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ text: original, targetLang: lang })
-        })
-          .then(function (resp) { return resp.json(); })
-          .then(function (data) {
-            if (data && data.used && typeof data.translatedText === "string") {
-              node.textContent = data.translatedText;
-            }
-          })
-          .catch(function () { /* Silently fail; Google Translate will handle it */ });
-      })(nodes[i]);
+      if (item.complete) {
+        el.setAttribute("lang", lang);
+        el.classList.remove("i18n-translating");
+      } else {
+        el.classList.add("i18n-translating");
+      }
     }
   }
 
-  /* ===== Set HTML lang attribute ===== */
-  function setHtmlLang(lang) {
-    document.documentElement.setAttribute("lang", lang);
+  function requestTranslations(keys) {
+    var url = "/api/translations?lang=" + encodeURIComponent(lang) + "&keys=" + encodeURIComponent(keys.join(","));
+    return fetch(url, { credentials: "same-origin", headers: { Accept: "application/json" } }).then(function (r) {
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      return r.json();
+    });
   }
 
-  /* ===== Expose detected language for other scripts (e.g. share button) ===== */
-  window.__i18nLang = "en";
+  function refresh() {
+    pollTimer = null;
+    var byKey = translatableElements();
+    var keys = [];
+    for (var k in byKey) {
+      if (Object.prototype.hasOwnProperty.call(byKey, k) && applied[k + "#complete"] !== true) keys.push(k);
+    }
+    if (!keys.length) {
+      revealPage();
+      return;
+    }
+    requestTranslations(keys.slice(0, 80))
+      .then(function (data) {
+        var items = (data && data.items) || {};
+        var incomplete = false;
+        for (var i = 0; i < keys.length; i++) {
+          var key = keys[i];
+          var item = items[key];
+          if (!item) continue;
+          applyItem(byKey[key], item);
+          if (typeof item.html === "string") applied[key] = item.html;
+          if (item.complete) applied[key + "#complete"] = true;
+          else incomplete = true;
+        }
+        updateDocumentTitle();
+        revealPage();
+        if (incomplete || keys.length > 80) schedulePoll();
+      })
+      .catch(function () {
+        revealPage();
+        schedulePoll();
+      });
+  }
+
+  /* No more polling: what is not translated by now stays as it is, without the pulse. */
+  function stopPulse() {
+    each(".i18n-translating", function (el) {
+      el.classList.remove("i18n-translating");
+    });
+  }
+
+  function schedulePoll() {
+    if (pollTimer) return;
+    if (Date.now() > pollUntil) {
+      stopPulse();
+      return;
+    }
+    pollTimer = setTimeout(function () {
+      if (document.hidden) {
+        pollTimer = null;
+        return; /* resumed by visibilitychange */
+      }
+      refresh();
+    }, pollDelay);
+    pollDelay = Math.min(15000, Math.round(pollDelay * 1.4));
+  }
+
+  document.addEventListener("visibilitychange", function () {
+    if (document.hidden || lang === SITE_LANG || pollTimer) return;
+    if (Date.now() < pollUntil) refresh();
+    else stopPulse();
+  });
+
+  /* ===== Leftovers from the old Google Translate widget ===== */
+  function clearLegacyTranslateCookies() {
+    if (document.cookie.indexOf("googtrans") === -1) return;
+    var expire = "=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/";
+    document.cookie = "googtrans" + expire;
+    document.cookie = "googtrans" + expire + "; domain=." + location.hostname;
+  }
+
+  /* ===== Expose the language for other scripts (share button, forms) ===== */
+  window.__i18nLang = SITE_LANG;
   window.__i18nUi = ui;
+  window.__i18nT = function (key, vars) { return format(t(key), vars); };
 
-  /* ===== Init on DOMContentLoaded ===== */
-  document.addEventListener("DOMContentLoaded", function () {
-    /* Always clear stale Google Translate cookies so language detection is
-       fresh for each visitor — shared links won't carry someone else's
-       language preference. */
-    clearTranslateCookies();
-    cleanUrlHash();
+  function init() {
+    clearLegacyTranslateCookies();
+    wireConfirmPrompts();
 
-    var lang = detectBestLang();
-
-    /* Expose detected language globally */
+    lang = detectBestLang();
     window.__i18nLang = lang;
 
-    /* Set HTML lang attribute */
-    setHtmlLang(lang);
+    if (lang === SITE_LANG) {
+      revealPage();
+      return;
+    }
 
-    /* Translate static UI strings from the built-in dictionary */
-    translateUiStrings(lang);
+    document.documentElement.setAttribute("lang", lang);
+    translateInterface();
+    updateDocumentTitle();
 
-    /* Translate placeholder attributes */
-    translatePlaceholders(lang);
+    /* Text still in English keeps its own language tag for screen readers;
+       content gets the visitor's language once its translation is complete.
+       (Admin forms marked translate="no" have translated labels inside.) */
+    each("[translate='no'], [data-translate-key]", function (el) {
+      if (el.hasAttribute("lang")) return;
+      if (el.getAttribute("translate") === "no" && el.querySelector("[data-i18n]")) return;
+      el.setAttribute("lang", "en");
+    });
 
-    /* Translate confirm prompt messages */
-    translateConfirmPrompts(lang);
+    pollUntil = Date.now() + 15 * 60 * 1000;
+    refresh();
+  }
 
-    /* Attempt server-side API translation for marked dynamic content */
-    translateDynamicContent(lang);
-
-    /* Auto-translate the full page via Google Translate for non-English */
-    initGoogleTranslate(lang);
-  });
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
+  else init();
 })();

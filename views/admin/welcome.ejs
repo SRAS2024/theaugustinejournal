@@ -1,27 +1,13 @@
 <!doctype html>
-<html lang="<%= typeof detectedLang !== 'undefined' ? detectedLang : 'en' %>" translate="yes">
+<html lang="en" data-title-key="dashboard">
   <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="detected-lang" content="<%= typeof detectedLang !== 'undefined' ? detectedLang : 'en' %>" />
-    <meta name="robots" content="noindex, nofollow" />
+<%- include("../partials/admin-head") %>
     <title>Welcome | The Augustine Journal</title>
-    <link rel="icon" href="/public/icons/favicon.ico" sizes="48x48" />
-    <link rel="icon" href="/public/icons/favicon.svg" type="image/svg+xml" />
-    <link rel="icon" type="image/png" sizes="16x16" href="/public/icons/favicon-16.png" />
-    <link rel="icon" type="image/png" sizes="32x32" href="/public/icons/favicon-32.png" />
-    <link rel="icon" type="image/png" sizes="48x48" href="/public/icons/favicon-48.png" />
-    <link rel="apple-touch-icon" href="/public/icons/apple-touch-icon.png" />
-    <link rel="manifest" href="/public/site.webmanifest" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Inter:wght@300;400;500&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="/public/css/styles.css" />
   </head>
   <body>
     <header class="topbar">
       <div class="container header-inner">
-        <h1 class="brand notranslate">The Augustine Journal</h1>
+        <h1 class="brand" translate="no">The Augustine Journal</h1>
         <div class="admin-nav">
           <span class="muted" data-i18n="adminSite">Administrative Site</span>
         </div>
@@ -30,18 +16,18 @@
 
     <main class="container" style="max-width:520px;">
       <section class="section card" style="text-align:center;">
-        <h2 class="listTitle" style="margin-bottom:4px;"><span data-i18n="welcome">Welcome,</span> <span class="notranslate"><%= adminName || "Ryan" %></span>!</h2>
+        <h2 class="listTitle" style="margin-bottom:4px;" data-i18n-template="welcomeName" data-var-name="<%= adminName %>">Welcome, <%= adminName %>!</h2>
         <p class="muted" style="margin-bottom:24px;" data-i18n="loadingDashboard">Loading your dashboard&hellip;</p>
 
         <!-- Loading circle -->
         <div style="display:flex;justify-content:center;margin-bottom:24px;">
-          <div id="loaderWrap" style="width:80px;height:80px;position:relative;">
+          <div id="loaderWrap" style="width:80px;height:80px;position:relative;" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
             <!-- Charcoal circle background -->
-            <svg width="80" height="80" viewBox="0 0 80 80" style="position:absolute;inset:0;">
+            <svg width="80" height="80" viewBox="0 0 80 80" style="position:absolute;inset:0;" aria-hidden="true">
               <circle cx="40" cy="40" r="35" fill="none" stroke="#3a3a3a" stroke-width="4" />
             </svg>
             <!-- Dark purple loading arc -->
-            <svg id="loaderArc" width="80" height="80" viewBox="0 0 80 80" style="position:absolute;inset:0;transform:rotate(-90deg);">
+            <svg id="loaderArc" width="80" height="80" viewBox="0 0 80 80" style="position:absolute;inset:0;transform:rotate(-90deg);" aria-hidden="true">
               <circle cx="40" cy="40" r="35" fill="none" stroke="#5b2d8e" stroke-width="4"
                 stroke-dasharray="220" stroke-dashoffset="220" stroke-linecap="round" />
             </svg>
@@ -49,16 +35,17 @@
         </div>
 
         <!-- Loading bar -->
-        <div style="width:100%;height:6px;border-radius:999px;background:#3a3a3a;overflow:hidden;">
+        <div style="width:100%;height:6px;border-radius:999px;background:#3a3a3a;overflow:hidden;" aria-hidden="true">
           <div id="loadBar" style="height:100%;width:0%;background:#5b2d8e;border-radius:999px;transition:none;"></div>
         </div>
       </section>
     </main>
 
     <script src="/public/js/i18n.js"></script>
-    <script>
+    <script nonce="<%= cspNonce %>">
       (function() {
         var bar = document.getElementById('loadBar');
+        var wrap = document.getElementById('loaderWrap');
         var arc = document.getElementById('loaderArc').querySelector('circle');
         var total = 3000;
         var start = performance.now();
@@ -67,6 +54,7 @@
         function tick(now) {
           var t = Math.min(1, (now - start) / total);
           bar.style.width = Math.round(t * 100) + '%';
+          wrap.setAttribute('aria-valuenow', String(Math.round(t * 100)));
           arc.setAttribute('stroke-dashoffset', circumference - (t * circumference));
           if (t < 1) {
             requestAnimationFrame(tick);
@@ -75,6 +63,8 @@
           }
         }
         requestAnimationFrame(tick);
+        // requestAnimationFrame pauses in background tabs; continue regardless.
+        setTimeout(function () { window.location.href = '/admin/dashboard'; }, total + 1500);
       })();
     </script>
   </body>

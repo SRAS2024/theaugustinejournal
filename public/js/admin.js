@@ -1,4 +1,33 @@
 (function () {
+  var MAX_PDF_BYTES = 15 * 1024 * 1024; // same limit as the server
+
+  // English text for the status messages; the dictionary in i18n.js has the
+  // translations under the same keys.
+  var FALLBACK = {
+    pdfExtracting: "Extracting text from PDF…",
+    pdfExtracted: "Text extracted. Edit the content below.",
+    pdfReplacedKeptText: "PDF replaced. Existing content preserved.",
+    pdfExtractFailed: "Failed to extract PDF text. Please try again.",
+    pdfNoText: "No selectable text was found in this PDF.",
+    pdfNotPdf: "Only PDF files can be uploaded.",
+    pdfTooLarge: "The PDF is larger than 15 MB.",
+    confirmSwitchToEditor: "Switching to Editor mode removes the original PDF from this post when you save. Continue?"
+  };
+
+  // Server error codes from /admin/posts/extract-pdf -> message keys.
+  var ERROR_KEYS = {
+    not_pdf: "pdfNotPdf",
+    too_large: "pdfTooLarge",
+    no_text: "pdfNoText"
+  };
+
+  function t(key) {
+    var ui = window.__i18nUi || {};
+    var lang = window.__i18nLang || "en";
+    var entry = ui[key];
+    return (entry && (entry[lang] || entry.en)) || FALLBACK[key] || key;
+  }
+
   document.addEventListener("DOMContentLoaded", () => {
     const contentMode = document.getElementById("contentMode");
     const editorWrap = document.getElementById("editorWrap");
@@ -8,6 +37,14 @@
     const pdfExtractStatus = document.getElementById("pdfExtractStatus");
     const pdfPathInput = document.getElementById("pdfPathInput");
 
+    function hasPdf() {
+      return !!(pdfPathInput && pdfPathInput.value);
+    }
+
+    function hasText(editor) {
+      return !!editor && editor.getText().trim().length > 0;
+    }
+
     function sync() {
       if (!contentMode) return;
       var mode = contentMode.value;
@@ -15,7 +52,7 @@
         if (pdfWrap) pdfWrap.style.display = "block";
         if (editorWrap) editorWrap.style.display = "none";
         // Show PDF editor if content was already extracted (edit mode)
-        if (pdfPathInput && pdfPathInput.value && pdfEditorWrap) {
+        if (pdfEditorWrap && (hasPdf() || hasText(window._pdfQuill))) {
           pdfEditorWrap.classList.add("visible");
         }
       } else {
@@ -24,46 +61,104 @@
       }
     }
 
+    // Both editors hold the post body. When the mode changes, carry what the
+    // admin edited over to the editor that will be saved, so switching never
+    // silently drops edits. The PDF editor is only filled once a PDF is
+    // attached; until then the upload fills it.
+    function carryContent(from, to) {
+      var editors = window._postEditors;
+      if (!editors || from === to) return;
+      var source = editors[from];
+      var target = editors[to];
+      if (!source || !target || !hasText(source)) return;
+      if (to === "PDF" && !hasPdf()) return;
+      if (editors.edited[from] || !hasText(target)) {
+        target.setContents(source.getContents());
+        editors.edited.RICH = false;
+        editors.edited.PDF = false;
+      }
+    }
+
+    function setStatus(key, isError) {
+      if (!pdfExtractStatus) return;
+      pdfExtractStatus.textContent = t(key);
+      pdfExtractStatus.classList.toggle("error", !!isError);
+    }
+
     if (contentMode) {
-      contentMode.addEventListener("change", sync);
+      var currentMode = contentMode.value;
+      contentMode.addEventListener("change", function () {
+        var mode = contentMode.value;
+        // Saving a PDF post in Editor mode deletes its PDF on the server.
+        if (currentMode === "PDF" && mode !== "PDF" && hasPdf() && !window.confirm(t("confirmSwitchToEditor"))) {
+          contentMode.value = currentMode;
+          return;
+        }
+        carryContent(currentMode, mode);
+        currentMode = mode;
+        sync();
+      });
       sync();
     }
 
     // PDF file upload -> AJAX extraction
     if (pdfFileInput) {
+      var requestId = 0;
+
       pdfFileInput.addEventListener("change", function () {
         var file = pdfFileInput.files[0];
         if (!file) return;
 
-        // Get CSRF token from the form
-        var csrfInput = document.querySelector('input[name="_csrf"]');
-        var csrfToken = csrfInput ? csrfInput.value : "";
-
-        if (pdfExtractStatus) {
-          pdfExtractStatus.textContent = "Extracting text from PDF...";
-          pdfExtractStatus.classList.remove("error");
+        // Checked here too so the admin gets an answer without uploading.
+        if (!/\.pdf$/i.test(file.name)) {
+          pdfFileInput.value = "";
+          setStatus("pdfNotPdf", true);
+          return;
+        }
+        if (file.size > MAX_PDF_BYTES) {
+          pdfFileInput.value = "";
+          setStatus("pdfTooLarge", true);
+          return;
         }
 
-        var formData = new FormData();
-        formData.append("pdfFile", file);
-        formData.append("_csrf", csrfToken);
+        // Get CSRF token from the form (or the page's csrf-token meta tag)
+        var csrfInput = document.querySelector('#postForm input[name="_csrf"]') ||
+          document.querySelector('input[name="_csrf"]');
+        var csrfMeta = document.querySelector('meta[name="csrf-token"]');
+        var csrfToken = csrfInput ? csrfInput.value : (csrfMeta ? csrfMeta.getAttribute("content") : "");
+        var titleInput = document.querySelector('input[name="title"]');
+        var thisRequest = ++requestId;
 
-        fetch("/admin/posts/extract-pdf?_csrf=" + encodeURIComponent(csrfToken), {
+        setStatus("pdfExtracting", false);
+
+        var formData = new FormData();
+        // The post title lets the server leave the PDF's own title out of the text.
+        if (titleInput) formData.append("title", titleInput.value);
+        formData.append("pdfFile", file);
+
+        fetch("/admin/posts/extract-pdf", {
           method: "POST",
+          headers: { "x-csrf-token": csrfToken },
+          credentials: "same-origin",
           body: formData
         })
           .then(function (resp) {
-            if (!resp.ok) throw new Error("Extraction failed");
-            return resp.json();
+            return resp.json().catch(function () { return {}; }).then(function (data) {
+              // Success is { html, filename, pdfPath }. A PDF without text may
+              // come back as { html: "", code: "no_text", pdfPath }: the PDF is
+              // kept and the admin is told there is no text to edit.
+              var stored = data && typeof data.html === "string" && !data.error && (!data.code || data.pdfPath);
+              if (!resp.ok || !stored) {
+                var err = new Error("Extraction failed");
+                err.code = data && data.code;
+                throw err;
+              }
+              return data;
+            });
           })
           .then(function (data) {
-            if (data.error) {
-              if (pdfExtractStatus) {
-                pdfExtractStatus.textContent = data.error;
-                pdfExtractStatus.classList.add("error");
-              }
-              return;
-            }
+            // A newer file was chosen while this one was being read.
+            if (thisRequest !== requestId) return;
 
             // Store the uploaded PDF path
             if (pdfPathInput) {
@@ -71,8 +166,9 @@
             }
 
             // Determine whether the editor is already visible and has content
+            var pdfQuill = window._pdfQuill;
             var editorAlreadyVisible = pdfEditorWrap && pdfEditorWrap.classList.contains("visible");
-            var editorHasContent = window._pdfQuill && window._pdfQuill.getText().trim().length > 0;
+            var editorHasContent = hasText(pdfQuill);
 
             // Show the PDF editor
             if (pdfEditorWrap) {
@@ -82,31 +178,26 @@
             // Only auto-insert extracted text when the editor was not visible
             // yet or when it is visible but empty. If the editor already
             // contains text, preserve the existing content untouched.
-            if (window._pdfQuill && (!editorAlreadyVisible || !editorHasContent)) {
-              // Strip the pdf-text wrapper div if present — inject plain paragraphs
-              var html = data.html || "";
-              var tmp = document.createElement("div");
-              tmp.innerHTML = html;
-              var inner = tmp.querySelector(".pdf-text");
-              window._pdfQuill.clipboard.dangerouslyPasteHTML(inner ? inner.innerHTML : html);
+            var kept = editorAlreadyVisible && editorHasContent;
+            if (pdfQuill && !kept && data.html) {
+              // Quill holds the paragraphs; the .pdf-text wrapper is re-added on submit.
+              pdfQuill.clipboard.dangerouslyPasteHTML(window._postEditors.unwrapPdfText(data.html));
             }
 
-            if (pdfExtractStatus) {
-              pdfExtractStatus.textContent = (editorAlreadyVisible && editorHasContent)
-                ? "PDF replaced. Existing content preserved."
-                : "Text extracted. Edit the content below.";
-              pdfExtractStatus.classList.remove("error");
-            }
+            if (data.code === "no_text" || !data.html.replace(/<[^>]*>/g, "").trim()) setStatus("pdfNoText", true);
+            else if (kept) setStatus("pdfReplacedKeptText", false);
+            else setStatus("pdfExtracted", false);
 
             // Clear the file input so the form doesn't re-upload the file
             // (PDF is already on the server)
             pdfFileInput.value = "";
           })
           .catch(function (err) {
-            if (pdfExtractStatus) {
-              pdfExtractStatus.textContent = "Failed to extract PDF text. Please try again.";
-              pdfExtractStatus.classList.add("error");
-            }
+            if (thisRequest !== requestId) return;
+            // Never leave a failed file selected: it would be uploaded again
+            // with the form on Save, even in Editor mode.
+            pdfFileInput.value = "";
+            setStatus(ERROR_KEYS[err && err.code] || "pdfExtractFailed", true);
           });
       });
     }

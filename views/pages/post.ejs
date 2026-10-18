@@ -1,0 +1,45 @@
+<%
+  const typeKey = post.type === "BLOG" ? "blog" : post.type === "ESSAY" ? "essay" : "letter";
+  const typeLabel = post.type === "BLOG" ? "Blog" : post.type === "ESSAY" ? "Essay" : "Letter";
+  const translateTitle = post.autoTranslateTitle !== false;
+%>
+<section class="postShell">
+  <header class="postHeader">
+    <% if (translateTitle) { %>
+      <h1 class="postTitle" id="postTitle" data-translate-key="post:<%= post.id %>:title" data-translate-kind="text"><%= post.title %></h1>
+    <% } else { %>
+      <h1 class="postTitle" id="postTitle" translate="no" lang="en"><%= post.title %></h1>
+    <% } %>
+    <div class="postMeta">
+      <span class="postType" data-i18n="<%= typeKey %>"><%= typeLabel %></span>
+      <span class="postMetaSep" aria-hidden="true">&mdash;</span>
+      <time class="postDate" datetime="<%= isoDate(post.postDate) %>" data-i18n-date><%= formatDate(post.postDate) %></time>
+    </div>
+  </header>
+
+  <div class="postRule"></div>
+
+  <article class="postContent" data-translate-key="post:<%= post.id %>:body" data-translate-kind="html">
+    <%- post.contentHtml || "" %>
+  </article>
+
+  <footer class="postFooter">
+    <button class="share-btn" id="shareBtn" type="button" data-post-id="<%= post.id %>">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
+      <span data-i18n="share" aria-live="polite">Share</span>
+    </button>
+    <span class="postFooter-divider" aria-hidden="true"></span>
+    <button class="subscribe-bell-btn" type="button">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+      <span data-i18n="subscribe">Subscribe</span>
+    </button>
+    <% if (post.pdfPath) { %>
+      <span class="postFooter-divider" aria-hidden="true"></span>
+      <a class="pdf-link" href="<%= post.pdfPath %>" target="_blank" rel="noopener noreferrer" data-i18n="viewPdf">View Original PDF</a>
+    <% } %>
+  </footer>
+</section>
+
+<%- include("../partials/subscribe-modal") %>
+<script src="/public/js/post.js" defer></script>
+<script src="/public/js/subscribe.js" defer></script>

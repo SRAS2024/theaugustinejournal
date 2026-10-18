@@ -5,11 +5,13 @@ import { nanoid } from "nanoid";
 const prisma = new PrismaClient();
 
 async function main() {
-  // Upsert singleton site settings (never overwrites user edits)
-  await prisma.siteSettings.upsert({
-    where: { id: 1 },
-    update: {},
-    create: {
+  // A fresh database gets the default site text and one example notice.
+  // Existing sites are never changed (deleting every notice stays deleted).
+  const existing = await prisma.siteSettings.findUnique({ where: { id: 1 } });
+  if (existing) return;
+
+  await prisma.siteSettings.create({
+    data: {
       id: 1,
       aboutHtml:
         "<p>The Augustine Journal is a publication dedicated to thoughtful reflection and discourse. " +
@@ -19,9 +21,7 @@ async function main() {
     }
   });
 
-  // Create a starter notice only if none exist
-  const noticeCount = await prisma.notice.count();
-  if (noticeCount === 0) {
+  if ((await prisma.notice.count()) === 0) {
     await prisma.notice.create({
       data: {
         id: nanoid(),
