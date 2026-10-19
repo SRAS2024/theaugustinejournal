@@ -293,7 +293,7 @@ export function polishTranslation(source, text, lang) {
   const srcEnd = source.trim().slice(-1);
   if (srcEnd && !/[.!?\u2026:;"\u201d\u2019\u00bb)\]]/.test(srcEnd) && /[^.]\.$/.test(out)) out = out.slice(0, -1);
   out = smartQuotes(out, lang);
-  if (lang === "fr") out = frenchSpacing(out);
+  if (lang === "fr") out = frenchSpacing(out.replace(/(\p{L})- (mêmes?)(?!\p{L})/gu, "$1-$2"));
   if (lang === "ru") out = out.replace(/ - /g, " \u2014 ");
   if (lang === "es") out = out.replace(/\b([Ss])ólo\b/g, "$1olo");
   return out;
@@ -409,13 +409,50 @@ function maxRepeat(text) {
   return max;
 }
 
-/** Heuristic check that a translation is not degenerate (empty, truncated or looping). */
+/**
+ * Heuristic check that a translation is not degenerate (empty, truncated or
+ * looping) and adds nothing the sentence does not say (see addsToSource).
+ */
 export function looksBroken(source, output) {
   const src = String(source || "").trim();
   const out = String(output || "").trim();
   if (!out) return true;
   if (src.length >= 12 && (out.length < src.length * 0.3 || out.length > src.length * 3.5 + 20)) return true;
+  if (addsToSource(src, out)) return true;
   // A phrase repeated more often than anything in the source (a decoding loop).
   const outRepeat = maxRepeat(out);
   return outRepeat >= 4 && outRepeat > maxRepeat(src) + 1;
+}
+
+/* ------------------------------------------------------------------ */
+/*  Additions the models invent                                       */
+/* ------------------------------------------------------------------ */
+
+// The models learned partly from translations of the Qur'an: "God" can come
+// out as "Allah", a prophet can gain an Islamic blessing, and biblical names
+// their Arabic forms ("Ибрахим" for Abraham). Sentences that name Islam
+// themselves are left alone.
+const ISLAMIC_RE = new RegExp(
+  "(?<!\\p{L})(?:allah\\p{L}*|аллах\\p{L}*|alá|ﷺ|pbuh|мир ему|(?:que la )?paix (?:et bénédictions? )?(?:soit )?sur lui" +
+    "|la paz sea con él|friede sei mit ihm|que a paz esteja com ele" +
+    "|ибрахим\\p{L}*|исхак\\p{L}*|марьям\\p{L}*|юсуф\\p{L}*|дауд\\p{L}*|сулейман\\p{L}*|джибрил\\p{L}*" +
+    "|ис(?:а|ы|е|у|ой)|мус(?:а|ы|е|у|ой))(?!\\p{L})",
+  "iu"
+);
+const ISLAMIC_SOURCE_RE = /allah|qur['’]?an|koran|islam|muslim|muhammad|mohammed|mosque|imam/i;
+
+const verseRefs = (text) => new Set([...String(text).matchAll(/(\d+)\s*:\s*(\d+)/g)].map((m) => `${m[1]}:${m[2]}`));
+
+/**
+ * Does the translation say something the English sentence does not: a
+ * bracketed aside or citation, a Bible reference, or Islamic wording?
+ */
+export function addsToSource(source, output) {
+  const src = String(source || "");
+  const out = String(output || "");
+  if (/[()]/.test(out) && !/[()]/.test(src)) return true;
+  if (/\([^)]*$/.test(out) && !/\([^)]*$/.test(src)) return true; // a citation cut off at the end
+  const refs = verseRefs(src);
+  for (const ref of verseRefs(out)) if (!refs.has(ref)) return true;
+  return ISLAMIC_RE.test(out) && !ISLAMIC_SOURCE_RE.test(src);
 }

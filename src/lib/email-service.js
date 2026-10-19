@@ -178,95 +178,249 @@ function t(key, lang) {
 
 /* ── Build styled HTML email ── */
 /*
- * Email background strategy: Many email clients (Gmail, Outlook, Yahoo) strip
- * CSS "background" from <body> and ignore rgba() values. We use:
- *   - bgcolor="#0a0a0e" HTML attribute on every table, tr, and td
- *   - background-color:#0a0a0e inline style as reinforcement
- *   - Solid hex colors instead of rgba() for all foreground/border colors
- *
- * Color mapping (site palette → email-safe hex):
- *   --bg        #0a0a0e  →  #0a0a0e
- *   --text      #e8e8ed  →  #e8e8ed
- *   --muted     #8a8a99  →  #8a8a99
- *   border rgba(255,255,255,0.07) on #0a0a0e  →  #1c1c20
- *   btn bg rgba(255,255,255,0.02) on #0a0a0e  →  #0f0f13
- *   text  rgba(232,232,237,0.88)              →  #ccccD1
- *   purple decorative                         →  #2b1c3e
+ * The emails are built to hold up in every mail app:
+ *   - Table layout, 600px wide and fluid on phones. Outlook for Windows (Word)
+ *     ignores max-width, so it gets a fixed 600px "ghost" table inside
+ *     <!--[if mso]> comments.
+ *   - Every colour is a solid hex value (Outlook drops rgba()), written as a
+ *     bgcolor attribute and as an inline style on every coloured cell. Borders
+ *     are 1px of padding around a cell, so they are coloured cells too.
+ *   - Every text element carries its own colour, font, size and line height:
+ *     the Gmail apps with non-Google accounts ignore <style> altogether.
+ *   - Web fonts are an enhancement; Georgia and Arial stand in where they do
+ *     not load, and Outlook is pointed at them with mso-font-alt.
+ *   - Forced dark modes: the design is dark already, so "light dark" is
+ *     declared (Apple Mail leaves it alone) and the colours are pinned again
+ *     where apps repaint them: Gmail (a gradient of the same colour, which it
+ *     does not invert, plus two blend layers that turn inverted text back) and
+ *     Outlook.com / Outlook apps ([data-ogsc] / [data-ogsb]).
+ *   - The artwork is transparent PNG at twice its displayed size, so it stays
+ *     sharp and sits on any of the colours below without an edge.
  *
  * Every interpolated value goes through escapeHtml.
  */
 
-/** Divider + unsubscribe footer rows (empty when there is no unsubscribe URL) */
-function unsubscribeRows(unsubscribeUrl, lang) {
-  if (!unsubscribeUrl) return "";
-  return `
-        <!-- Decorative rule -->
-        <tr bgcolor="#0a0a0e"><td align="center" bgcolor="#0a0a0e" style="background-color:#0a0a0e;padding:0 0 20px;">
-          <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="margin:0;"><tr><td style="height:1px;background-color:#1c1c20;font-size:1px;line-height:1px;">&nbsp;</td></tr></table>
-        </td></tr>
+/** The email palette: ivory on warm charcoal with dark purple accents, as on the site. */
+const EMAIL_COLORS = Object.freeze({
+  page: "#131211",       // warm charcoal behind the card (the site's ground)
+  panel: "#1A1917",      // the card (cathedral and ornament PNGs are rendered for it)
+  panelEdge: "#2B2926",  // the card's hairline edge
+  button: "#211F1D",     // post link
+  buttonEdge: "#3F3549", // post link edge (charcoal with a trace of purple)
+  ivory: "#F1EBDD",      // site title, post title
+  text: "#E2DBCB",       // message
+  muted: "#A39C8D",      // footer (warm grey)
+  link: "#CDC5B4",       // footer link
+  purple: "#5B2D8E",     // accent line at the top of the card
+  accent: "#A88BD4"      // ornament (drawn into ornament-email.png)
+});
 
-        <!-- Unsubscribe -->
-        <tr bgcolor="#0a0a0e"><td align="center" bgcolor="#0a0a0e" style="background-color:#0a0a0e;padding:0;">
-          <p style="margin:0;font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;font-size:11px;color:#5c5c67;letter-spacing:0.3px;">
-            ${escapeHtml(t("dontWantEmails", lang))} <a href="${escapeHtml(unsubscribeUrl)}" style="color:#5c5c67;text-decoration:underline;">${escapeHtml(t("unsubscribeLinkText", lang))}</a>
-          </p>
-        </td></tr>
-`;
+const SERIF = "'Cormorant Garamond',Georgia,'Times New Roman',Times,serif";
+const SANS = "Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif";
+const FONTS_CSS = "https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&family=Inter:wght@400;500&display=swap";
+
+// Cells whose colour is pinned in dark modes (class "bg-<name>")
+const FILLED = ["page", "panelEdge", "panel", "buttonEdge", "button", "purple"];
+// Text colours restored in Outlook's dark mode (class "tx-<name>")
+const TEXT_COLORS = ["ivory", "text", "muted", "link"];
+
+/** Inline style for a text element: colour, font, size and line height always set */
+function textStyle({ font, size, lineHeight, color, extra = "" }) {
+  return `margin:0;font-family:${font};font-size:${size}px;line-height:${lineHeight}px;color:${EMAIL_COLORS[color]};mso-line-height-rule:exactly;${extra}`;
 }
 
-/** Full email document: site title, cathedral, rule and message, then extraRows */
-function renderEmailDocument({ lang, subject, preheader, message, extraRows }) {
-  const cathedralImgUrl = `${SITE_URL()}/public/icons/cathedral-email.png`;
+/** Opening <td> of a coloured cell: bgcolor, inline background and the pinning class */
+function filledCell(name, { classes = "", style = "", attrs = "" } = {}) {
+  const color = EMAIL_COLORS[name];
+  return `<td align="center" bgcolor="${color}"${attrs} class="bg-${name}${classes ? ` ${classes}` : ""}" style="background-color:${color};${style}">`;
+}
+
+// Longest pair of last words (characters in both together) that noWidow joins. The message spans
+// the card, 262px on a 320px phone; 22 characters of its 17px serif take at most about 225px
+// (Georgia, Cyrillic), and every message in EMAIL_STRINGS stays within it.
+const NO_WIDOW_MAX = 22;
+
+/**
+ * Joins the last two words with a no-break space so a phone never leaves one word alone on the
+ * last line. Only a short pair is joined: a long one could not wrap and would push the card wider
+ * than a narrow phone. Not used on post titles, which can be any length (see postButtonRow).
+ */
+function noWidow(text) {
+  const value = String(text ?? "");
+  const space = value.lastIndexOf(" ");
+  if (space <= 0) return value;
+  const previous = value.slice(value.lastIndexOf(" ", space - 1) + 1, space);
+  const last = value.slice(space + 1);
+  if (!previous || !last || previous.length + last.length > NO_WIDOW_MAX) return value;
+  return `${value.slice(0, space)}\u00a0${last}`;
+}
+
+/** Gmail's dark mode inverts text; these two blend layers invert it back (Gmail only, see GMAIL_CSS). */
+function keepTextColor(html) {
+  return `<div class="gm-screen"><div class="gm-diff">${html}</div></div>`;
+}
+
+/*
+ * <style> blocks. Gmail drops a whole block when it meets something it does
+ * not support, so the Gmail rules (u + .body is Gmail's own wrapper) and the
+ * mobile sizes stay apart from the attribute selectors used by other apps.
+ */
+const GMAIL_CSS = [
+  "body{margin:0!important;padding:0!important;width:100%!important;-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%;}",
+  "table,td{border-collapse:collapse;mso-table-lspace:0pt;mso-table-rspace:0pt;}",
+  "img{border:0;outline:none;text-decoration:none;-ms-interpolation-mode:bicubic;}",
+  `u + .body{background-image:linear-gradient(${EMAIL_COLORS.page},${EMAIL_COLORS.page})!important;}`,
+  "u + .body .gm-screen{background:#000000;mix-blend-mode:screen;}",
+  "u + .body .gm-diff{background:#000000;mix-blend-mode:difference;}",
+  ...FILLED.map(name => `u + .body .bg-${name}{background-image:linear-gradient(${EMAIL_COLORS[name]},${EMAIL_COLORS[name]})!important;}`),
+  "@media screen and (max-width:520px){",
+  ".pad-page{padding:24px 12px 32px!important;}",
+  ".pad-panel{padding:0 22px 38px!important;}",
+  ".pad-top{padding:38px 0 20px!important;}",
+  ".t-title{font-size:26px!important;line-height:32px!important;}",
+  ".t-message{font-size:17px!important;line-height:28px!important;}",
+  "}",
+  // Narrow phones (320-374px, e.g. 360px Android): less padding in the card and the post button,
+  // so a long word in a post title ("Auferstehungsverheißung", "достопримечательностях") fits whole
+  // in Cormorant and Georgia, and from 360px also in Gmail for Android's Noto Serif. From 375px up
+  // the email looks exactly as above.
+  "@media screen and (max-width:374px){",
+  ".pad-panel{padding:0 16px 38px!important;}",
+  ".pad-button{padding:14px!important;}",
+  "}"
+].join("\n");
+
+// Apple Mail, Outlook.com and the Outlook apps, Samsung Email: colour scheme, auto-links, dark-mode repaints
+const DARK_MODE_CSS = [
+  ":root{color-scheme:light dark;supported-color-schemes:light dark;}",
+  "a[x-apple-data-detectors]{color:inherit!important;text-decoration:none!important;font-size:inherit!important;font-family:inherit!important;font-weight:inherit!important;line-height:inherit!important;}",
+  "#MessageViewBody a{color:inherit;text-decoration:none;font-size:inherit;font-family:inherit;font-weight:inherit;line-height:inherit;}",
+  // Outlook marks what it repainted with data-ogsc / data-ogsb: on the element itself or on a parent
+  ...TEXT_COLORS.map(name => `[data-ogsc] .tx-${name},.tx-${name}[data-ogsc]{color:${EMAIL_COLORS[name]}!important;}`),
+  ...FILLED.map(name => `[data-ogsb] .bg-${name},.bg-${name}[data-ogsb]{background-color:${EMAIL_COLORS[name]}!important;}`),
+  "@media (prefers-color-scheme:dark){",
+  ...TEXT_COLORS.map(name => `.tx-${name}{color:${EMAIL_COLORS[name]}!important;}`),
+  ...FILLED.map(name => `.bg-${name}{background-color:${EMAIL_COLORS[name]}!important;}`),
+  "}"
+].join("\n");
+
+// Outlook for Windows: Georgia / Arial instead of Times New Roman for fonts it lacks
+const OUTLOOK_CSS = [
+  "@font-face{font-family:'Cormorant Garamond';mso-font-alt:Georgia;}",
+  "@font-face{font-family:Inter;mso-font-alt:Arial;}",
+  ".f-serif{font-family:Georgia,'Times New Roman',serif!important;}",
+  ".f-sans{font-family:Arial,Helvetica,sans-serif!important;}"
+].join("\n");
+
+/** Unsubscribe line under the card (empty when there is no unsubscribe URL) */
+function footerRow(unsubscribeUrl, lang) {
+  if (!unsubscribeUrl) return "";
+  const small = { font: SANS, size: 12, lineHeight: 19 };
+  const link = `<a href="${escapeHtml(unsubscribeUrl)}" class="f-sans tx-link" style="${textStyle({ ...small, color: "link", extra: "text-decoration:underline;white-space:nowrap;" })}">${escapeHtml(t("unsubscribeLinkText", lang))}</a>`;
+  return `
+            <!-- Unsubscribe -->
+            <tr><td align="center" style="padding:26px 20px 0;">
+              ${keepTextColor(`<p class="f-sans tx-muted" style="${textStyle({ ...small, color: "muted", extra: "letter-spacing:0.2px;" })}">${escapeHtml(t("dontWantEmails", lang))} ${link}</p>`)}
+            </td></tr>`;
+}
+
+/**
+ * Post link: a bordered button that Outlook draws square and everything else rounds. The button
+ * is only as wide as its title, so the title is never joined by noWidow, and a word too long for
+ * the phone (a German compound, say) breaks instead of widening the card (word-break:break-word
+ * is the one that also narrows the button; Outlook for Windows ignores both and stays 600px).
+ * Below 375px the button and the card have less padding (pad-button, pad-panel), so words of up to
+ * about 23 letters fit whole on a 320px phone in Cormorant and Georgia (Noto Serif, which Gmail for
+ * Android uses, is wider: there such words fit from 360px and may break at 320px).
+ */
+function postButtonRow(postTitle, postUrl) {
+  return `
+                  <!-- Post link -->
+                  <tr><td align="center" style="padding:0;">
+                    <table role="presentation" align="center" cellpadding="0" cellspacing="0" border="0" style="margin:0 auto;">
+                      <tr>${filledCell("buttonEdge", { style: "padding:1px;border-radius:9px;" })}
+                        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                          <tr>${filledCell("button", { style: "border-radius:8px;mso-padding-alt:14px 28px;" })}
+                            ${keepTextColor(`<a href="${escapeHtml(postUrl)}" class="f-serif tx-ivory pad-button" style="${textStyle({ font: SERIF, size: 19, lineHeight: 26, color: "ivory", extra: "display:inline-block;padding:14px 28px;font-weight:500;letter-spacing:0.2px;text-decoration:none;overflow-wrap:break-word;word-break:break-word;" })}">${escapeHtml(postTitle)}</a>`)}
+                          </td></tr>
+                        </table>
+                      </td></tr>
+                    </table>
+                  </td></tr>`;
+}
+
+/** Full email document: the card with title, cathedral, ornament, message and button, then the footer */
+function renderEmailDocument({ lang, subject, preheader, message, button = "", footer = "" }) {
+  const icons = `${SITE_URL()}/public/icons`;
+  // Fine charcoal grain around the card, as on the site. An HTML attribute, not CSS url(): Gmail has
+  // dropped whole style attributes that contain url(). Flat charcoal wherever it is not shown.
+  const grain = ` background="${escapeHtml(`${icons}/grain-email.png`)}"`;
+  // The cathedral is fluid up to its 260px (width:100%;max-width:260px), not 260px capped at 100%:
+  // a blocked or failed image keeps its box, which must never push a 320px phone sideways.
+  // Outlook for Windows sizes it from width="260".
   return `<!DOCTYPE html>
-<html lang="${escapeHtml(lang)}" xmlns="http://www.w3.org/1999/xhtml">
+<html lang="${escapeHtml(lang)}" dir="ltr" xmlns="http://www.w3.org/1999/xhtml" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">
 <head>
-  <meta charset="utf-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1"/>
-  <meta name="color-scheme" content="dark"/>
-  <meta name="supported-color-schemes" content="dark"/>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="x-apple-disable-message-reformatting">
+  <meta name="format-detection" content="telephone=no, date=no, address=no, email=no, url=no">
+  <meta name="color-scheme" content="light dark">
+  <meta name="supported-color-schemes" content="light dark">
   <title>${escapeHtml(subject)}</title>
-  <!--[if !mso]><!-->
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&family=Inter:wght@300;400;500&display=swap"/>
-  <!--<![endif]-->
+  <!--[if mso]><noscript><xml><o:OfficeDocumentSettings><o:AllowPNG/><o:PixelsPerInch>96</o:PixelsPerInch></o:OfficeDocumentSettings></xml></noscript><![endif]-->
+  <!--[if !mso]><!--><link rel="stylesheet" href="${FONTS_CSS}"><!--<![endif]-->
   <style>
-    :root { color-scheme: dark; supported-color-schemes: dark; }
-    body, table, td { background-color: #0a0a0e !important; }
+${GMAIL_CSS}
   </style>
-  <!--[if mso]>
-  <style>body,table,td{background:#0a0a0e !important;}</style>
-  <![endif]-->
+  <style>
+${DARK_MODE_CSS}
+  </style>
+  <!--[if mso]><style>
+${OUTLOOK_CSS}
+  </style><![endif]-->
 </head>
-<body bgcolor="#0a0a0e" style="margin:0;padding:0;background-color:#0a0a0e;color:#e8e8ed;font-family:'Cormorant Garamond',Georgia,'Times New Roman',serif;">
-  <!-- Preheader text (visible in inbox preview, hidden in email body) -->
-  <div style="display:none;font-size:1px;color:#0a0a0e;line-height:1px;max-height:0px;max-width:0px;opacity:0;overflow:hidden;">${escapeHtml(preheader)}${"&#847; &zwnj; &nbsp; ".repeat(30)}</div>
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" bgcolor="#0a0a0e" style="background-color:#0a0a0e;margin:0;padding:0;">
-    <tr bgcolor="#0a0a0e">
-      <td align="center" bgcolor="#0a0a0e" style="background-color:#0a0a0e;padding:40px 20px;">
-        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" bgcolor="#0a0a0e" style="background-color:#0a0a0e;max-width:560px;">
-
-        <!-- Title: The Augustine Journal -->
-        <tr bgcolor="#0a0a0e"><td align="center" bgcolor="#0a0a0e" style="background-color:#0a0a0e;padding:0 0 24px;">
-          <h1 style="margin:0;font-family:'Cormorant Garamond',Georgia,serif;font-size:28px;font-weight:500;letter-spacing:0.5px;color:#e8e8ed;">${escapeHtml(t("siteTitle", lang))}</h1>
-        </td></tr>
-
-        <!-- Cathedral artwork (hosted PNG — Gmail and Outlook do not display SVG images) -->
-        <tr bgcolor="#0a0a0e"><td align="center" bgcolor="#0a0a0e" style="background-color:#0a0a0e;padding:0 0 28px;">
-          <img src="${escapeHtml(cathedralImgUrl)}" alt="${escapeHtml(t("cathedralAlt", lang))}" width="260" height="140" style="display:block;margin:0 auto;width:260px;max-width:100%;height:auto;border:0;" />
-        </td></tr>
-
-        <!-- Decorative rule -->
-        <tr bgcolor="#0a0a0e"><td align="center" bgcolor="#0a0a0e" style="background-color:#0a0a0e;padding:0 0 24px;">
-          <table role="presentation" cellpadding="0" cellspacing="0" width="200" style="margin:0 auto;"><tr><td style="height:1px;background-color:#2b1c3e;font-size:1px;line-height:1px;">&nbsp;</td></tr></table>
-        </td></tr>
-
-        <!-- Message -->
-        <tr bgcolor="#0a0a0e"><td align="center" bgcolor="#0a0a0e" style="background-color:#0a0a0e;padding:0 0 24px;">
-          <p style="margin:0;font-family:'Cormorant Garamond',Georgia,serif;font-size:18px;line-height:1.7;color:#ccccd1;">${escapeHtml(message)}</p>
-        </td></tr>
-${extraRows}
+<body class="body" bgcolor="${EMAIL_COLORS.page}" style="margin:0;padding:0;width:100%;background-color:${EMAIL_COLORS.page};-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%;">
+  <div role="article" aria-roledescription="email" aria-label="${escapeHtml(subject)}" lang="${escapeHtml(lang)}" dir="ltr">
+  <!-- Preheader: shown in the inbox preview, hidden in the message -->
+  <div style="display:none;mso-hide:all;font-family:${SANS};font-size:1px;line-height:1px;max-height:0;max-width:0;opacity:0;overflow:hidden;color:${EMAIL_COLORS.page};">${escapeHtml(preheader)}${"&#847; &zwnj; &nbsp; ".repeat(40)}</div>
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${EMAIL_COLORS.page}" class="bg-page" style="width:100%;background-color:${EMAIL_COLORS.page};">
+    <tr>${filledCell("page", { classes: "pad-page", style: "padding:40px 16px 44px;", attrs: grain })}
+      <!--[if mso]><table role="presentation" align="center" width="600" cellpadding="0" cellspacing="0" border="0"><tr><td><![endif]-->
+      <table role="presentation" align="center" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:600px;margin:0 auto;">
+        <tr>${filledCell("panelEdge", { style: "padding:1px;border-radius:12px;" })}
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+            <tr>${filledCell("panel", { classes: "pad-panel", style: "padding:0 36px 44px;border-radius:11px;" })}
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                <!-- Accent mark hanging from the top edge -->
+                <tr><td align="center" style="padding:0;">
+                  <table role="presentation" align="center" width="56" cellpadding="0" cellspacing="0" border="0" style="margin:0 auto;"><tr>${filledCell("purple", { style: "height:2px;font-size:2px;line-height:2px;mso-line-height-rule:exactly;" })}&nbsp;</td></tr></table>
+                </td></tr>
+                <!-- Site title -->
+                <tr><td align="center" class="pad-top" style="padding:44px 0 22px;">
+                  ${keepTextColor(`<h1 class="f-serif tx-ivory t-title" style="${textStyle({ font: SERIF, size: 28, lineHeight: 34, color: "ivory", extra: "font-weight:500;letter-spacing:0.6px;" })}">${escapeHtml(t("siteTitle", lang))}</h1>`)}
+                </td></tr>
+                <!-- Cathedral (PNG: Gmail and Outlook do not show SVG images) -->
+                <tr><td align="center" style="padding:0 0 24px;">
+                  <img src="${escapeHtml(`${icons}/cathedral-email-ivory.png`)}" alt="${escapeHtml(t("cathedralAlt", lang))}" width="260" height="140" class="f-serif" style="display:block;margin:0 auto;width:100%;max-width:260px;height:auto;border:0;outline:none;text-decoration:none;text-align:center;font-family:${SERIF};font-size:14px;line-height:20px;font-style:italic;color:${EMAIL_COLORS.muted};">
+                </td></tr>
+                <!-- Ornament -->
+                <tr><td align="center" style="padding:0 0 24px;">
+                  <img src="${escapeHtml(`${icons}/ornament-email.png`)}" alt="" width="160" height="12" style="display:block;margin:0 auto;width:160px;height:12px;border:0;outline:none;text-decoration:none;">
+                </td></tr>
+                <!-- Message -->
+                <tr><td align="center" style="padding:0${button ? " 0 30px" : ""};">
+                  ${keepTextColor(`<p class="f-serif tx-text t-message" style="${textStyle({ font: SERIF, size: 18, lineHeight: 29, color: "text" })}">${escapeHtml(noWidow(message))}</p>`)}
+                </td></tr>${button}
+              </table>
+            </td></tr>
+          </table>
+        </td></tr>${footer}
       </table>
+      <!--[if mso]></td></tr></table><![endif]-->
     </td></tr>
   </table>
+  </div>
 </body>
 </html>`;
 }
@@ -274,18 +428,13 @@ ${extraRows}
 /** Email with a post link button (new post, weekly throwback) */
 export function buildEmailHtml({ subject, message, postTitle, postUrl, unsubscribeUrl, lang }) {
   const code = normalizeLang(lang);
-  const postRow = `
-        <!-- Post link (styled rectangular treatment) -->
-        <tr bgcolor="#0a0a0e"><td align="center" bgcolor="#0a0a0e" style="background-color:#0a0a0e;padding:0 0 36px;">
-          <a href="${escapeHtml(postUrl)}" style="display:inline-block;padding:14px 24px;border-radius:8px;border:1px solid #1c1c20;background-color:#0f0f13;font-family:'Cormorant Garamond',Georgia,serif;font-size:18px;font-weight:500;color:#e8e8ed;text-decoration:none;">${escapeHtml(postTitle)}</a>
-        </td></tr>
-`;
   return renderEmailDocument({
     lang: code,
     subject,
     preheader: `${message} — ${postTitle}`,
     message,
-    extraRows: postRow + unsubscribeRows(unsubscribeUrl, code)
+    button: postButtonRow(postTitle, postUrl),
+    footer: footerRow(unsubscribeUrl, code)
   });
 }
 
@@ -297,7 +446,7 @@ export function buildSimpleEmailHtml({ subject, message, unsubscribeUrl, lang })
     subject,
     preheader: `${message} — ${t("siteTitle", code)}`,
     message,
-    extraRows: unsubscribeRows(unsubscribeUrl, code)
+    footer: footerRow(unsubscribeUrl, code)
   });
 }
 

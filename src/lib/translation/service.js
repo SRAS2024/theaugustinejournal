@@ -11,7 +11,7 @@ import { nanoid } from "nanoid";
 import { getPrisma } from "../db.js";
 import { sanitizeRichHtml } from "../sanitize.js";
 import { htmlSegments, translateHtml, textSegments, translateText } from "./html.js";
-import { buildCaseStats, isTitleCase, sentenceCase, prepareSource, polishTranslation } from "./text.js";
+import { buildCaseStats, isTitleCase, sentenceCase, prepareSource, polishTranslation, looksBroken } from "./text.js";
 import { MODELS, modelKey } from "./models.js";
 import { TranslationEngine } from "./engine.js";
 import { TARGET_LANGS, normalizeLang } from "../languages.js";
@@ -122,6 +122,12 @@ let retryTimer = null;
 let sequence = 0;
 let cooldownUntil = 0; // after a failed batch, wait before trying again
 
+/**
+ * A stored translation that turned out degenerate, or that adds something
+ * the sentence does not say (rows from before those checks), is redone.
+ */
+const needsRetranslation = (prepared, row) => !row.model.endsWith("#untranslated") && looksBroken(prepared, row.text);
+
 /** Queue a prepared sentence; resolves once it is stored (or given up on). */
 function enqueue(lang, prepared, hash, priority) {
   const id = `${lang}:${hash}`;
@@ -166,13 +172,14 @@ async function pump() {
       }
       try {
         engine ||= new TranslationEngine({ log });
-        const { outputs, model } = await engine.run(lang, batch.map((j) => j.prepared));
+        const { outputs, model, alt = [] } = await engine.run(lang, batch.map((j) => j.prepared));
         const rows = batch.map((job, i) => ({
           hash: job.hash,
           prepared: job.prepared,
-          // A sentence the model could not translate is kept in English.
+          // A sentence no model could translate is kept in English; one from the
+          // language's fallback model is marked so it is not redone as a stopgap.
           text: outputs[i] ?? job.prepared,
-          model: outputs[i] == null ? `${model}#untranslated` : model
+          model: outputs[i] == null ? `${model}#untranslated` : alt.includes(i) ? `${model}#alt` : model
         }));
         await storeRows(lang, rows);
         for (const job of batch) {
@@ -307,6 +314,10 @@ async function renderItems(lang, items, priority, stats) {
   for (const item of items) for (const source of sourcesOf(item)) seg(source);
 
   const rows = await fetchRows(lang, [...new Set([...prepared.values()].map((s) => s.hash))]);
+  for (const s of prepared.values()) {
+    const row = rows.get(s.hash);
+    if (row && needsRetranslation(s.prepared, row)) rows.delete(s.hash); // shown in English until redone
+  }
   const lookup = (source) => {
     const s = seg(source);
     const row = rows.get(s.hash);
@@ -407,9 +418,9 @@ async function backfill() {
         if (seen.has(s.hash)) continue;
         seen.add(s.hash);
         const row = rows.get(s.hash);
-        // Missing, left untranslated, or produced by a fallback model while the
-        // main one was unavailable.
-        if (!row || !row.model.startsWith(primary) || row.model.endsWith("#untranslated")) {
+        // Missing, left untranslated, produced by a fallback model while the
+        // main one was unavailable, or flawed.
+        if (!row || !row.model.startsWith(primary) || row.model.endsWith("#untranslated") || needsRetranslation(s.prepared, row)) {
           enqueue(lang, s.prepared, s.hash, PRIORITY.background);
           queued++;
         }

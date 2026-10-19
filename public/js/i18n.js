@@ -130,13 +130,13 @@
     },
     editor:  { en: "Editor", es: "Editor", pt: "Editor", fr: "Éditeur", de: "Editor", ru: "Редактор" },
     pdf:     { en: "PDF", es: "PDF", pt: "PDF", fr: "PDF", de: "PDF", ru: "PDF" },
-    viewsCount: {
-      en: { one: "{n} view", other: "{n} views" },
-      es: { one: "{n} visita", other: "{n} visitas" },
-      pt: { one: "{n} visualização", other: "{n} visualizações" },
-      fr: { one: "{n} vue", other: "{n} vues" },
-      de: { one: "{n} Aufruf", other: "{n} Aufrufe" },
-      ru: { one: "{n} просмотр", few: "{n} просмотра", many: "{n} просмотров", other: "{n} просмотра" }
+    readsCount: {
+      en: { one: "{n} read", other: "{n} reads" },
+      es: { one: "{n} lectura", other: "{n} lecturas" },
+      pt: { one: "{n} leitura", other: "{n} leituras" },
+      fr: { one: "{n} lecture", other: "{n} lectures" },
+      de: { one: "{n}-mal gelesen", other: "{n}-mal gelesen" },
+      ru: { one: "{n} прочтение", few: "{n} прочтения", many: "{n} прочтений", other: "{n} прочтения" }
     },
     sharesCount: {
       en: { one: "{n} share", other: "{n} shares" },
@@ -215,6 +215,34 @@
       fr: "Si vous passez en mode Éditeur, le PDF original sera retiré de cette publication à l’enregistrement. Continuer" + NNBSP + "?",
       de: "Beim Wechsel in den Editor-Modus wird das Original-PDF beim Speichern aus diesem Beitrag entfernt. Fortfahren?",
       ru: "При переключении в режим редактора исходный PDF будет удалён из публикации после сохранения. Продолжить?"
+    },
+    autoFormat: { en: "Auto format", es: "Formato automático", pt: "Formatação automática", fr: "Mise en forme automatique", de: "Automatisch formatieren", ru: "Автоформатирование" },
+    autoFormatHint: {
+      en: "Tidies paragraph spacing, keeps verse lines together and formats the references. The words are not changed.",
+      es: "Ordena el espaciado de los párrafos, mantiene juntos los versos y da formato a las referencias. Las palabras no cambian.",
+      pt: "Organiza o espaçamento dos parágrafos, mantém os versos juntos e formata as referências. As palavras não são alteradas.",
+      fr: "Harmonise l’espacement des paragraphes, garde les vers ensemble et met en forme les références. Les mots ne sont pas modifiés.",
+      de: "Ordnet die Absatzabstände, hält Verszeilen zusammen und formatiert die Quellenangaben. Der Wortlaut bleibt unverändert.",
+      ru: "Выравнивает интервалы между абзацами, сохраняет стихотворные строки вместе и оформляет список литературы. Текст не меняется."
+    },
+    autoFormatting: { en: "Formatting…", es: "Aplicando formato…", pt: "Formatando…", fr: "Mise en forme…", de: "Wird formatiert…", ru: "Форматирование…" },
+    autoFormatted: {
+      en: "Formatted. Press Ctrl+Z (⌘Z on a Mac) to undo.",
+      es: "Formato aplicado. Pulsa Ctrl+Z (⌘Z en Mac) para deshacerlo.",
+      pt: "Formatação aplicada. Pressione Ctrl+Z (⌘Z no Mac) para desfazer.",
+      fr: "Mise en forme appliquée. Appuyez sur Ctrl+Z (⌘Z sur Mac) pour annuler.",
+      de: "Formatiert. Mit Strg+Z (⌘Z auf dem Mac) rückgängig machen.",
+      ru: "Отформатировано. Нажмите Ctrl+Z (⌘Z на Mac), чтобы отменить."
+    },
+    autoFormatNoChange: { en: "The formatting is already consistent.", es: "El formato ya es uniforme.", pt: "A formatação já está uniforme.", fr: "La mise en forme est déjà homogène.", de: "Die Formatierung ist bereits einheitlich.", ru: "Оформление уже единообразно." },
+    autoFormatEmpty: { en: "There is nothing to format yet.", es: "Todavía no hay nada que formatear.", pt: "Ainda não há nada para formatar.", fr: "Il n’y a encore rien à mettre en forme.", de: "Es gibt noch nichts zu formatieren.", ru: "Пока нечего форматировать." },
+    autoFormatFailed: {
+      en: "The text could not be formatted. Please try again.",
+      es: "No se pudo dar formato al texto. Inténtalo de nuevo.",
+      pt: "Não foi possível formatar o texto. Tente novamente.",
+      fr: "Le texte n’a pas pu être mis en forme. Veuillez réessayer.",
+      de: "Der Text konnte nicht formatiert werden. Bitte versuchen Sie es erneut.",
+      ru: "Не удалось отформатировать текст. Попробуйте ещё раз."
     },
 
     /* ── Admin: site settings ── */
@@ -588,10 +616,12 @@
 
   /* ===== Leftovers from the old Google Translate widget ===== */
   function clearLegacyTranslateCookies() {
-    if (document.cookie.indexOf("googtrans") === -1) return;
-    var expire = "=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/";
-    document.cookie = "googtrans" + expire;
-    document.cookie = "googtrans" + expire + "; domain=." + location.hostname;
+    try {
+      if (document.cookie.indexOf("googtrans") === -1) return;
+      var expire = "=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/";
+      document.cookie = "googtrans" + expire;
+      document.cookie = "googtrans" + expire + "; domain=." + location.hostname;
+    } catch (e) { /* cookies unavailable (sandboxed page) */ }
   }
 
   /* ===== Expose the language for other scripts (share button, forms) ===== */

@@ -61,7 +61,7 @@ export class TranslationEngine {
     if (!job) return;
     this.pending.delete(msg.id);
     clearTimeout(job.timer);
-    if (msg.type === "result") job.resolve({ outputs: msg.outputs, model: msg.model });
+    if (msg.type === "result") job.resolve({ outputs: msg.outputs, model: msg.model, alt: msg.alt || [] });
     else job.reject(new Error(msg.message || "Translation failed"));
   }
 
@@ -72,7 +72,7 @@ export class TranslationEngine {
     return this.crashes.length >= 3;
   }
 
-  /** Translate `texts` into `lang`. Resolves { outputs: (string|null)[], model }. */
+  /** Translate `texts` into `lang`. Resolves { outputs: (string|null)[], model, alt: number[] }. */
   run(lang, texts) {
     if (this.stopped) return Promise.reject(new Error("Translation engine stopped"));
     if (this.isBackingOff()) return Promise.reject(new Error("Translation worker is crashing; backing off"));

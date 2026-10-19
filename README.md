@@ -13,7 +13,7 @@ A clean, professional journal and blog platform with built-in newsletter functio
 ### Public Website
 - **Home page** with centered title, editable about section, notices (up to 3), and latest post link
 - **Blog**, **Essays**, and **Letters** sections with posts ordered by date
-- **Individual post pages** with view tracking, share button, and optional original PDF link
+- **Individual post pages** with read counting, share button, and optional original PDF link
 - **Responsive design** with mobile hamburger menu navigation
 - **Automatic translation** into Spanish, Portuguese, French, German and Russian (see [Translation](#translation))
 - **SEO** with auto-generated sitemap.xml (with `lastmod` on every page), robots.txt, canonical URLs, JSON-LD structured data (Article + WebSite), Open Graph meta tags, and Twitter Cards
@@ -22,7 +22,7 @@ A clean, professional journal and blog platform with built-in newsletter functio
 - **Share button** using the Web Share API with clipboard fallback
 - **Friendly 404 page** for unknown addresses
 - **BIMI support** at `/.well-known/bimi` for branded sender icons in email clients
-- Color palette: black, white, grey, and dark purple accents
+- **Design**: ivory text on a textured warm charcoal ground, dark purple accents, a hand-sketched line-drawn cathedral and thin line ornaments; Cormorant Garamond and Inter
 
 ### Translation
 Readers see the site in their browser's language when it is English, Spanish, Portuguese, French, German or Russian. Nothing needs to be chosen and nothing is remembered between visits, so a shared link always opens in the reader's own language.
@@ -30,8 +30,9 @@ Readers see the site in their browser's language when it is English, Spanish, Po
 - **Interface text** (navigation, buttons, dates, messages, emails) comes from hand-written dictionaries in all six languages.
 - **Content** — post titles, post bodies, notices and the home page text — is translated by the site's **own translation engine**. No Google Translate, no external API and no API keys are involved.
 - The engine runs the University of Helsinki's open **OPUS-MT** neural translation models directly on the server: a hand-written SentencePiece tokenizer, the transformer network built as an ONNX graph from the published weights, and beam-search decoding, executed with ONNX Runtime on the CPU. Every model is pinned to an exact revision and verified by SHA-256 before use.
+- Every translated sentence is checked before it is used. One that comes out garbled, or that adds something the English does not say (a bracketed aside, a Bible reference, or Islamic wording such as "Allah" for God, which the models picked up from Qur'an translations in their training data), is translated again with other settings and then with the language's second model; if neither is right, that sentence stays in English.
 - Every translated sentence is stored in the database, so each sentence is translated only once. After a post is created or edited, its translations are prepared in the background straight away, and new-post emails carry the title in each subscriber's language.
-- Formatting is preserved: paragraphs, headings, lists, links, line breaks and emphasis. URLs, code and anything marked `notranslate` are left as they are.
+- Formatting is preserved: paragraphs, headings, lists, links, line breaks and emphasis. URLs, code and anything marked `notranslate` are left as they are, and so is a post's reference list (from its References / Bibliography / Works Cited heading to the next section heading), so citations stay exactly as written.
 - The **Auto Translation for Title** switch on each post keeps that title in its original language.
 - While a long new post is still being translated, its translated paragraphs appear as soon as they are ready.
 
@@ -58,8 +59,22 @@ Readers see the site in their browser's language when it is English, Spanish, Po
   - References/bibliography section detection and styling
   - First-line indentation preservation
 - Posts require: type, title, date, and content (validated on create/save; the form keeps what was typed when something is missing)
+- **Automatic formatting** on every save, and an **Auto format** button under the editor to see the result first (undo with Ctrl/Cmd+Z). It never changes a word; it only fixes layout:
+  - pasted colours, tabs, stray spaces and empty spacer paragraphs are removed (a blank line that separates stanzas or prayers is kept)
+  - paragraphs split in the middle of a sentence (typical of PDF text) are joined
+  - verse such as a creed or psalm is kept line by line in one block
+  - the References / Bibliography / Works Cited section gets a centered heading and one hanging-indent entry per source, with wrapped lines and split URLs joined and web addresses made into links
 - Automatic URL slug generation from post title
-- Unique view tracking per post (SHA-256 hashed visitor fingerprint)
+- **Reads** per post (shown in the admin posts list). A read counts once the reader has spent the post's reading time on the visible page and scrolled a little; short pages that cannot scroll need only the time:
+
+  | Post length | Time on the page |
+  |-------------|------------------|
+  | up to 300 words | 10 seconds |
+  | 500 words | 15 seconds |
+  | 700 words | 30 seconds |
+  | longer | +2 seconds per 100 words, at most 45 seconds |
+
+  Each device counts once per post: the browser keeps a random device id (local storage and a first-party cookie) that is stored only as a keyed hash. Each post page carries a signed ticket, so a read cannot be sent sooner than the reading time or replayed, reads are rate-limited, and crawlers and the signed-in admin are not counted. The view numbers from before reads existed are kept as each post's starting count.
 - Share count tracking per post
 
 ### Newsletter & Email System
@@ -69,23 +84,24 @@ Readers see the site in their browser's language when it is English, Spanish, Po
 - **New post notifications** — all subscribers are emailed when a new post is created, with the post title translated into each subscriber's language
 - **Weekly throwback** — automatic Thursday email (from 09:00 in `THROWBACK_TIMEZONE`, America/Chicago by default) featuring an older post on rotation; a send is claimed in the database first so it can never go out twice
 - **Internationalized emails** — all email copy in the subscriber's language (en, es, pt, fr, de, ru)
-- Dark-themed HTML email templates with cathedral artwork (PNG, displayed by Gmail and Outlook), Cormorant Garamond + Inter fonts, and a matching plain-text version with the post and unsubscribe links
+- Email templates in the site's design (ivory on charcoal, line-drawn cathedral and ornament as transparent 2x PNGs) built to hold up in every mail app: table layout with a fixed-width Outlook table, solid colours on every cell, inline styles on every text element, web fonts with Georgia/Arial fallbacks, colours pinned against the dark modes of Gmail, Outlook.com and Apple Mail, artwork that stays visible when a mail app turns an email light, and a matching plain-text version with the post and unsubscribe links
 - Rate-limited sending with retry logic and exponential backoff
 - Email audit trail logged in the database
 
 ### Storage
-Ten data models stored in PostgreSQL:
+Eleven data models stored in PostgreSQL:
 
 1. **Post** — blog, essay, and letter content
 2. **SiteSettings** — about text (singleton)
 3. **Notice** — home page notices (up to 3)
-4. **PostView** — unique view records per post
+4. **PostView** — view history from before reads were counted (no longer written)
 5. **PdfFile** — PDF binary backup (survives ephemeral filesystem redeployments)
 6. **Subscriber** — email subscribers with language preference
 7. **EmailLog** — audit trail of sent emails (type, post, timestamp)
 8. **ThrowbackTracker** — rotation state for weekly throwback emails
 9. **Translation** — every translated sentence, per language
 10. **PostRedirect** — previous URL slugs that redirect to a post
+11. **PostRead** — one row per device that has read a post
 
 ---
 
@@ -118,7 +134,7 @@ theaugustinejournal/
   package.json               # Dependencies and scripts (package-lock.json pins versions)
   .npmrc                     # Skips onnxruntime-node's optional CUDA download
   prisma/
-    schema.prisma            # Database schema (10 models)
+    schema.prisma            # Database schema (11 models)
     seed.js                  # Idempotent default data seeding
     migrations/              # Prisma migration history
   src/
@@ -133,9 +149,10 @@ theaugustinejournal/
       security.js            # Admin password verification (bcryptjs)
       unsubscribe.js         # Signed unsubscribe links
       indexnow.js            # IndexNow search-engine pings
+      post-format.js         # Automatic post formatting (paragraphs, verse, references)
+      reads.js               # Read counting: reading time, signed read tickets, reader keys
       view-helpers.js        # Escaping and date helpers for the views
       uploads.js             # File upload directory utilities
-      cathedral-svg.js       # Cathedral SVG artwork
       translation/
         service.js           # What to translate, sentence storage, background queue
         engine.js            # Runs the translation worker process
@@ -155,24 +172,29 @@ theaugustinejournal/
     routes/
       public.js              # Public pages (home, blog, essays, letters, post, sitemap, robots, BIMI)
       admin.js               # Admin dashboard, CRUD, PDF extraction, notice and subscriber management
-      api.js                 # Translations, subscribe, unsubscribe and share count endpoints
+      api.js                 # Translations, reads, subscribe, unsubscribe and share count endpoints
   public/
     css/styles.css           # Complete stylesheet
     js/
       i18n.js                # Automatic translation in the browser (dictionaries + engine results)
       subscribe.js           # Subscribe dialog
       post.js                # Share button
+      reads.js               # Counts a read after time on the page and a little scrolling
       admin.js               # Admin form toggle and PDF upload AJAX logic
       admin-confirm.js       # Confirmation + password dialogs for admin deletions
       quill-init.js          # Rich text editor initialization (dual editor mode)
-    icons/                   # Favicon, BIMI icon and email artwork
+    icons/                   # Favicon, BIMI icon and email artwork (SVG sources next to the PNGs)
+    img/grain.png            # Charcoal grain texture
     site.webmanifest         # Web app manifest
   views/
     layout.ejs               # Base HTML layout
     home.ejs, list.ejs, post.ejs, not-found.ejs   # Pages (bodies in views/pages/)
     unsubscribe.ejs          # Unsubscribe confirmation page
-    partials/                # Header, footer, subscribe dialog, admin header/navigation/dialogs
+    partials/                # Header, footer, ornament, subscribe dialog, admin header/navigation/dialogs
     admin/                   # Login, welcome, dashboard, posts, post form, settings, subscribers
+  scripts/
+    format-posts.mjs         # Formats stored posts (dry run by default; --apply --backup <file>, --restore <file>)
+    generate-favicons.js     # Builds the favicon and app icons
   test/                      # Unit tests (node --test)
   uploads/                   # PDF file storage (filesystem cache)
 ```
@@ -188,7 +210,7 @@ theaugustinejournal/
 | `DATABASE_URL` | Yes | PostgreSQL connection string (auto-set by Railway) |
 | `ADMIN_USERNAME` | Yes | Admin login username |
 | `ADMIN_PASSWORD` | Yes | Admin login password |
-| `SESSION_SECRET` | Recommended | Session signing key. Without it a random key is used and admins are signed out on every restart. Also signs unsubscribe links. |
+| `SESSION_SECRET` | Recommended | Session signing key. Without it a random key is used and admins are signed out on every restart. Also signs unsubscribe links and keys read counting (read tickets and stored device hashes): changing it breaks unsubscribe links in emails already sent and lets every device be counted once more. |
 | `PORT` | No | Server port (default: 8080) |
 | `NODE_ENV` | No | Set to `production` for secure cookies, HTTPS upgrades and IndexNow pings |
 | `SITE_URL` | No | Canonical URL for sitemap, robots.txt and email links (default: https://theaugustinejournal.com) |
@@ -272,6 +294,18 @@ Set `TRANSLATION_DISABLED=true` in `.env` to skip downloading translation models
 - **Credentials:** Set via the `ADMIN_USERNAME` and `ADMIN_PASSWORD` environment variables.
 
 After login, a 3-second welcome animation plays before redirecting to the dashboard.
+
+### Formatting existing posts
+
+Posts are formatted when they are saved. To format posts that are already stored (for example after changing the formatting rules), run from the app folder with `DATABASE_URL` set:
+
+```bash
+node scripts/format-posts.mjs                                   # dry run: shows every change
+node scripts/format-posts.mjs --apply --backup posts-backup.json
+node scripts/format-posts.mjs --restore posts-backup.json       # undo
+```
+
+`--restore` only puts back posts that still hold what `--apply` wrote, so a post edited since then is never overwritten (unless `--force`, with `--backup <file>` for a copy of what it replaces). Only `contentHtml` is written, so each post's `updatedAt` stays as it was. Other options: `--from-json <file>` (dry run on a JSON dump, no database), `--report <file>` (write the report to a new file), `--slug <slug>` (one post).
 
 ---
 

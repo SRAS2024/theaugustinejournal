@@ -1,5 +1,6 @@
-<section class="section card">
+<section class="section card listPage">
   <h2 class="listTitle" data-i18n="<%= pageKey %>"><%= pageTitle %></h2>
+  <%- include("../partials/ornament", { ornamentClass: "list-ornament" }) %>
 
   <% if (posts && posts.length) { %>
     <% posts.forEach(function (p) { %>

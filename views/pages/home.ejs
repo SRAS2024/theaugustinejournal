@@ -157,6 +157,8 @@
     <%- settings && settings.aboutHtml ? settings.aboutHtml : '' %>
   </div>
 
+  <%- include("../partials/ornament", { ornamentClass: "home-ornament" }) %>
+
   <div class="latest">
     <span class="label" data-i18n="checkLatest">Check out our latest post</span>
     <% if (latest) { %>

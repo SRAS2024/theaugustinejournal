@@ -5,6 +5,7 @@ import assert from "node:assert/strict";
 
 import { sanitizeRichHtml } from "../src/lib/sanitize.js";
 import { pdfTextToHtml } from "../src/lib/pdf-text.js";
+import { formatPostHtml } from "../src/lib/post-format.js";
 
 const clean = (html) => sanitizeRichHtml(html);
 
@@ -146,5 +147,20 @@ describe("sanitizeRichHtml: lang", () => {
       sanitizeRichHtml('<p lang="en" class="pdf-ref-entry">Sheen</p><li lang="fr">x</li><span lang="en">y</span>'),
       '<p class="pdf-ref-entry" lang="en">Sheen</p><li>x</li><span>y</span>'
     );
+  });
+});
+
+describe("sanitizeRichHtml: formatted posts", () => {
+  test("keeps everything post-format.js produces", () => {
+    const html = [
+      "<h3>Statement of Doctrine</h3>",
+      "<p>I believe in one God,<br />maker of heaven and earth.</p>",
+      '<p class="ql-indent-1">O give thanks to the Lord,<br />for his steadfast love endures forever.</p>',
+      '<h3 class="pdf-ref-heading">References</h3>',
+      '<p class="pdf-ref-entry">Stoner, P. W. (1958). Science speaks. <a href="https://example.org/a" target="_blank" rel="noopener noreferrer">https://example.org/a</a></p>',
+      '<p class="pdf-ref-entry">The Holy Bible.<br />Isaiah 29:13</p>'
+    ].join("");
+    assert.equal(clean(html), html);
+    assert.equal(formatPostHtml(html), html);
   });
 });

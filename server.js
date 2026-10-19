@@ -189,7 +189,11 @@ app.use((req, res, next) => {
   );
 });
 
-app.use(express.json({ limit: "1mb" }));
+// The editor's Auto format request (POST /admin/posts/format) carries a whole
+// post, which can be as large as a saved one: that route parses its own JSON,
+// with a larger limit, after the admin check (src/routes/admin.js).
+const jsonBody = express.json({ limit: "1mb" });
+app.use((req, res, next) => (/^\/admin\/posts\/format\/?$/i.test(req.path) ? next() : jsonBody(req, res, next)));
 app.use(express.urlencoded({ extended: true, limit: "2mb" }));
 
 /* ------------------------------------------------------------------ */

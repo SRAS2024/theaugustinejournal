@@ -2,22 +2,34 @@
 
 :root {
   color-scheme: dark;
-  --bg: #0a0a0e;
-  --bg2: #111116;
-  --surface: #18181f;
-  --card: rgba(255, 255, 255, 0.025);
-  --card-border: rgba(255, 255, 255, 0.06);
-  --card-shadow: 0 2px 12px rgba(0, 0, 0, 0.35), 0 1px 3px rgba(0, 0, 0, 0.2);
-  --text: #e8e8ed;
-  --muted: #8a8a99;
-  --border: rgba(255, 255, 255, 0.07);
-  --border-hover: rgba(255, 255, 255, 0.14);
+  /* Warm charcoal ground */
+  --bg: #131211;
+  --bg2: #191816;
+  --surface: #1c1b19;
+  /* Ivory ink; every quieter tone comes from the same warm family */
+  --ivory: #f1ebdd;
+  --text: #ebe4d4;
+  --text-body: #e2dbcb;
+  --text-soft: #cdc5b4;
+  --muted: #a39c8d;
+  --placeholder: #948d80;
+  --scrollbar-thumb: #7a7366;
+  --sketch: #c4bba9;
+  --card: rgba(241, 235, 221, 0.022);
+  --card-border: rgba(241, 235, 221, 0.075);
+  --card-shadow: inset 0 1px 0 rgba(255, 250, 240, 0.03), 0 2px 14px rgba(0, 0, 0, 0.3), 0 1px 3px rgba(0, 0, 0, 0.18);
+  --border: rgba(241, 235, 221, 0.08);
+  --border-hover: rgba(241, 235, 221, 0.17);
+  --rule: rgba(241, 235, 221, 0.14);
   --purple: #5b2d8e;
-  --purple-soft: rgba(91, 45, 142, 0.07);
-  --purple-border: rgba(91, 45, 142, 0.2);
-  --purple-glow: rgba(91, 45, 142, 0.04);
+  --purple-soft: rgba(91, 45, 142, 0.115);
+  --purple-border: rgba(132, 92, 188, 0.3);
+  --purple-glow: rgba(91, 45, 142, 0.075);
   --accent: #a88bd4;
+  --accent-line: rgba(168, 139, 212, 0.42);
   --focus-ring: #a88bd4;
+  --danger: #e5877b;
+  --success: #8fcf9f;
   --radius: 8px;
   --radius-lg: 12px;
   --font-serif: "Cormorant Garamond", Georgia, "Times New Roman", Times, serif;
@@ -28,41 +40,64 @@
 
 /* ===== Reset ===== */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-html { height: 100%; -webkit-text-size-adjust: 100%; }
+html {
+  height: 100%;
+  -webkit-text-size-adjust: 100%;
+  /* A warm thumb that still reads at 3:1 or more on the charcoal */
+  scrollbar-color: var(--scrollbar-thumb) transparent;
+}
+/* Charcoal paper: a fine tiled grain over a warm ground, with the faint purple
+   glow at the top. The grain is a static image (no live filter), so scrolling
+   stays cheap, and it also dithers the glow so it never bands. */
 body {
   min-height: 100%;
   display: flex;
   flex-direction: column;
-  background: var(--bg);
+  background-color: var(--bg);
   background-image:
-    radial-gradient(ellipse 70% 50% at 50% 0%, rgba(91, 45, 142, 0.04) 0%, transparent 70%);
+    url("/public/img/grain.png"),
+    radial-gradient(ellipse 70% 50% at 50% 0%, var(--purple-glow) 0%, transparent 70%);
+  background-image:
+    image-set(url("/public/img/grain.png") 1x, url("/public/img/grain.png") 2x),
+    radial-gradient(ellipse 70% 50% at 50% 0%, var(--purple-glow) 0%, transparent 70%);
+  background-repeat: repeat, no-repeat;
   color: var(--text);
   font-family: var(--font-serif);
   font-size: 16px;
   line-height: 1.6;
+  font-kerning: normal;
+  text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   isolation: isolate;
 }
 
-/* Subtle matte grain on the outer background */
-body::before {
-  content: "";
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  z-index: -1;
-  pointer-events: none;
-  filter: url(#grain-filter);
-  opacity: 0.03;
+::selection {
+  background: rgba(91, 45, 142, 0.6);
+  color: #fffaf0;
 }
 
 a { color: inherit; text-decoration: none; }
-a:hover { text-decoration: underline; }
+a:hover {
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.2em;
+}
 img { max-width: 100%; height: auto; }
 button, input, select, textarea { font: inherit; color: inherit; }
+
+/* Labels that only screen readers need */
+.visually-hidden {
+  position: absolute !important;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
 
 /* ===== Translation (self-hosted engine) ===== */
 /* While a page is being translated, <html> carries .i18n-pending. Text that is
@@ -109,10 +144,40 @@ main.container {
   max-width: var(--max-w);
 }
 
+/* ===== Ornament: hairlines meeting at a small cross drawn like the cathedral's ===== */
+.ornament {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  color: var(--sketch);
+  pointer-events: none;
+  user-select: none;
+}
+
+.ornament::before,
+.ornament::after {
+  content: "";
+  flex: 0 1 150px;
+  height: 1px;
+}
+
+.ornament::before { background: linear-gradient(to left, var(--rule), transparent); }
+.ornament::after { background: linear-gradient(to right, var(--rule), transparent); }
+
+.ornament svg {
+  flex: none;
+  width: 40px;
+  height: 16px;
+  overflow: visible;
+  opacity: 0.6;
+}
+
 /* ===== Header / Topbar ===== */
 .topbar {
   padding: 28px 0 0;
-  border-bottom: 1px solid var(--border);
+  /* A hairline that fades out toward the edges */
+  background: linear-gradient(to right, transparent, var(--border) 18%, var(--border) 82%, transparent) bottom / 100% 1px no-repeat;
 }
 
 .header-inner {
@@ -126,10 +191,11 @@ main.container {
   font-family: var(--font-serif);
   font-size: 30px;
   font-weight: 500;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.02em;
   text-align: center;
   line-height: 1.2;
   margin: 0;
+  color: var(--ivory);
 }
 
 .brand a { text-decoration: none; }
@@ -140,6 +206,7 @@ main.container {
   display: none;
   background: none;
   border: none;
+  border-radius: var(--radius);
   cursor: pointer;
   padding: 8px;
   position: absolute;
@@ -151,12 +218,17 @@ main.container {
 .hamburger span {
   display: block;
   width: 22px;
-  height: 2px;
+  height: 1.5px;
   background: var(--muted);
-  margin: 5px 0;
-  transition: transform 0.25s ease, opacity 0.2s ease;
+  margin: 5.5px 0;
+  transition: transform 0.25s ease, opacity 0.2s ease, background 0.2s ease;
   border-radius: 2px;
 }
+
+.hamburger:hover span { background: var(--text); }
+
+/* It sits flush with the screen's right edge, so the ring is drawn inside it */
+.hamburger:focus-visible { outline-offset: -2px; }
 
 .hamburger.open span:nth-child(1) {
   transform: translateY(7px) rotate(45deg);
@@ -178,7 +250,7 @@ main.container {
   font-family: var(--font-sans);
   font-size: 13px;
   font-weight: 400;
-  letter-spacing: 0.3px;
+  letter-spacing: 0.03em;
 }
 
 .nav a, .nav .nav-label {
@@ -193,21 +265,32 @@ main.container {
 .nav a:hover {
   color: var(--text);
   text-decoration: none;
-  border-color: rgba(255, 255, 255, 0.06);
+  border-color: var(--border);
 }
 
 .nav a.active {
-  color: var(--text);
+  color: var(--ivory);
   border-color: var(--purple-border);
   background: var(--purple-soft);
 }
 
 /* ===== Cards / Sections ===== */
 .card {
+  position: relative;
   background: var(--card);
   border: 1px solid var(--card-border);
   border-radius: var(--radius-lg);
   box-shadow: var(--card-shadow);
+}
+
+/* A second, fainter rule just inside the edge, like a printed plate */
+.card::before {
+  content: "";
+  position: absolute;
+  inset: 5px;
+  border: 1px solid rgba(241, 235, 221, 0.03);
+  border-radius: calc(var(--radius-lg) - 4px);
+  pointer-events: none;
 }
 
 .section {
@@ -221,7 +304,7 @@ main.container {
 }
 
 .notice {
-  padding: 12px 16px;
+  padding: 12px 18px;
   border-radius: var(--radius);
   background: var(--purple-soft);
   border: 1px solid var(--purple-border);
@@ -229,9 +312,9 @@ main.container {
   font-family: var(--font-sans);
   font-size: 13px;
   font-weight: 400;
-  line-height: 1.45;
+  line-height: 1.55;
   text-align: center;
-  letter-spacing: 0.15px;
+  letter-spacing: 0.01em;
   overflow-wrap: break-word;
 }
 
@@ -243,9 +326,9 @@ main.container {
 .home-illustration {
   display: flex;
   justify-content: center;
-  margin: 20px auto 24px;
+  margin: 22px auto 26px;
   max-width: 300px;
-  color: var(--muted);
+  color: var(--sketch);
   user-select: none;
   pointer-events: none;
 }
@@ -272,32 +355,50 @@ main.container {
   margin: 0 0 12px 0;
 }
 
+.about p:last-child {
+  margin-bottom: 0;
+}
+
+.about a {
+  color: var(--accent);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.2em;
+  text-decoration-color: var(--accent-line);
+}
+
+.home-ornament {
+  margin: 30px auto 0;
+}
+
 /* ===== Latest Post ===== */
 .latest {
-  margin-top: 32px;
+  margin-top: 24px;
   text-align: center;
   font-family: var(--font-sans);
 }
 
 .latest .label {
   color: var(--muted);
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 400;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
-  margin-bottom: 12px;
+  margin-bottom: 14px;
   display: block;
 }
 
 .latest a {
   display: inline-block;
-  padding: 12px 20px;
+  padding: 12px 22px;
   border-radius: var(--radius);
   border: 1px solid var(--border);
-  background: rgba(255, 255, 255, 0.02);
+  background: rgba(241, 235, 221, 0.02);
+  color: var(--ivory);
   font-family: var(--font-serif);
   font-size: 18px;
   font-weight: 500;
+  letter-spacing: 0.01em;
   transition: border-color 0.2s, background 0.2s, transform 0.15s;
   max-width: 100%;
   overflow-wrap: break-word;
@@ -325,8 +426,14 @@ main.container {
   font-weight: 500;
   text-align: center;
   font-family: var(--font-serif);
-  letter-spacing: 0.4px;
+  letter-spacing: 0.02em;
+  color: var(--ivory);
   overflow-wrap: break-word;
+}
+
+/* Public list pages: a small ornament under the title */
+.listTitle + .list-ornament {
+  margin: -10px 0 26px;
 }
 
 .postRow {
@@ -338,8 +445,8 @@ main.container {
   padding: 18px 20px;
   border-radius: var(--radius);
   border: 1px solid var(--border);
-  background: rgba(0, 0, 0, 0.1);
-  transition: border-color 0.2s, transform 0.15s;
+  background: rgba(0, 0, 0, 0.12);
+  transition: border-color 0.2s, background 0.2s, transform 0.15s;
 }
 
 /* The row's text column (post title, subscriber email) may hold long words */
@@ -353,10 +460,12 @@ main.container {
   content: "";
   position: absolute;
   inset: 0;
+  border-radius: inherit;
 }
 
 .postRow:hover {
   border-color: var(--border-hover);
+  background: rgba(241, 235, 221, 0.018);
   transform: translateY(-1px);
 }
 
@@ -370,16 +479,48 @@ main.container {
   font-weight: 500;
   margin: 0;
   line-height: 1.35;
+  color: var(--ivory);
 }
 
+
 .postRow .date {
+  display: block;
   font-family: var(--font-sans);
   font-size: 12px;
   font-weight: 400;
   color: var(--muted);
   white-space: nowrap;
-  margin-top: 4px;
-  letter-spacing: 0.2px;
+  margin-top: 5px;
+  letter-spacing: 0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Public list rows: a fine drawn chevron appears on hover */
+.listPage .postRow {
+  padding-right: 44px;
+}
+
+.listPage .postRow::before {
+  content: "";
+  position: absolute;
+  right: 22px;
+  top: 50%;
+  width: 7px;
+  height: 7px;
+  border-top: 1px solid var(--sketch);
+  border-right: 1px solid var(--sketch);
+  transform: translate(-4px, -50%) rotate(45deg);
+  opacity: 0;
+  transition: opacity 0.2s, transform 0.2s;
+}
+
+.listPage .postRow:hover::before {
+  opacity: 0.6;
+  transform: translate(0, -50%) rotate(45deg);
+}
+
+.listPage .postRow .title a:hover {
+  text-decoration: none;
 }
 
 /* ===== Single Post ===== */
@@ -400,55 +541,49 @@ main.container {
 .postTitle {
   margin: 0;
   font-family: var(--font-serif);
-  font-size: 32px;
+  font-size: 34px;
   font-weight: 500;
-  line-height: 1.25;
-  letter-spacing: 0.3px;
-  color: var(--text);
+  line-height: 1.22;
+  letter-spacing: 0.01em;
+  color: var(--ivory);
   overflow-wrap: break-word;
+  text-wrap: balance;
 }
 
 .postMeta {
-  margin-top: 12px;
+  margin-top: 14px;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: 10px;
   font-family: var(--font-sans);
   font-size: 12px;
   font-weight: 400;
   color: var(--muted);
-  letter-spacing: 0.4px;
+  letter-spacing: 0.04em;
 }
 
 .postType {
   text-transform: uppercase;
-  letter-spacing: 0.8px;
+  letter-spacing: 0.14em;
   font-size: 11px;
   font-weight: 500;
   color: var(--accent);
 }
 
 .postMetaSep {
-  color: rgba(138, 138, 153, 0.3);
+  color: rgba(163, 156, 141, 0.45);
   font-size: 11px;
 }
 
 .postDate {
   font-size: 12px;
+  font-variant-numeric: tabular-nums;
 }
 
-/* ── Decorative rule between header and body ── */
+/* ── Ornament between header and body ── */
 .postRule {
-  margin: 28px 0 32px;
-  height: 1px;
-  background: linear-gradient(
-    to right,
-    transparent,
-    rgba(168, 139, 212, 0.18) 20%,
-    rgba(168, 139, 212, 0.18) 80%,
-    transparent
-  );
+  margin: 30px 0 34px;
 }
 
 /* ── Body content ── */
@@ -456,13 +591,36 @@ main.container {
   line-height: 2;
   font-size: 18px;
   font-family: var(--font-serif);
-  color: rgba(232, 232, 237, 0.92);
+  color: var(--text-body);
   text-align: left;
   overflow-wrap: break-word; /* long reference URLs wrap instead of widening the page */
 }
 
 .postContent p {
   margin: 0 0 22px 0;
+}
+
+.postContent > :last-child {
+  margin-bottom: 0;
+}
+
+.postContent strong, .postContent b {
+  font-weight: 600;
+  color: var(--text);
+}
+
+/* Lines kept together in one paragraph (a creed, a psalm, an address):
+   a little closer, so the lines read as one block rather than as paragraphs */
+.postContent p:has(> br) {
+  line-height: 1.85;
+}
+
+/* A verse line too long for the screen continues indented, so a wrapped line
+   is never mistaken for the next one */
+@supports (text-indent: 1em hanging each-line) {
+  .postContent p:has(> br):not([class*="ql-align-"], .pdf-indent, .pdf-ref-entry) {
+    text-indent: 1.5em hanging each-line;
+  }
 }
 
 /* PDF-extracted markup. These match with or without the .pdf-text wrapper,
@@ -473,28 +631,59 @@ main.container {
   text-indent: 2em;
 }
 
-/* ── References heading — centered, elegant, the only heading from PDF ── */
+/* ── References heading: centered under a short hairline with a lozenge ── */
 .postContent .pdf-ref-heading {
+  position: relative;
   text-align: center;
   font-family: var(--font-serif);
-  font-size: 22px;
-  font-weight: 500;
-  letter-spacing: 0.5px;
-  margin: 52px 0 24px;
-  padding-top: 32px;
-  border-top: 1px solid var(--border);
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  line-height: 1.5;
+  margin: 56px 0 26px;
+  padding-top: 34px;
   color: var(--text);
 }
 
-/* ── Reference entries — left-aligned with hanging indent ── */
+.postContent .pdf-ref-heading::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: min(220px, 60%);
+  height: 1px;
+  transform: translateX(-50%);
+  background: linear-gradient(to right, transparent, var(--rule) 30%, var(--rule) 70%, transparent);
+}
+
+.postContent .pdf-ref-heading::after {
+  content: "";
+  position: absolute;
+  top: -2.5px;
+  left: 50%;
+  width: 6px;
+  height: 6px;
+  border: 1px solid var(--sketch);
+  background: var(--bg);
+  opacity: 0.6;
+  transform: translateX(-50%) rotate(45deg);
+}
+
+/* ── Reference entries: left-aligned with a hanging indent ── */
 .postContent .pdf-ref-entry {
-  padding-left: 2.5em;
-  text-indent: -2.5em;
+  padding-left: 2em;
+  text-indent: -2em;
   text-align: left;
-  margin-bottom: 14px;
-  font-size: 0.92em;
+  margin-bottom: 12px;
+  font-size: 0.9em;
   line-height: 1.7;
-  color: rgba(232, 232, 237, 0.82);
+  color: var(--text-soft);
+}
+
+.postContent .pdf-ref-entry a {
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 /* ── Quill alignment & indent classes ── */
@@ -512,11 +701,13 @@ main.container {
 
 /* ── Rich-text headings (non-PDF content), kept below the post title size ── */
 .postContent h1, .postContent h2, .postContent h3, .postContent h4 {
-  margin: 32px 0 14px 0;
+  margin: 36px 0 14px 0;
   font-weight: 500;
   font-family: var(--font-serif);
   line-height: 1.35;
   text-align: left;
+  color: var(--ivory);
+  letter-spacing: 0.01em;
 }
 
 .postContent h1 { font-size: 1.4em; }
@@ -525,17 +716,29 @@ main.container {
 .postContent h4 { font-size: 1em; }
 
 .postContent blockquote {
-  margin: 24px 0;
-  padding: 16px 24px;
-  border-left: 3px solid rgba(168, 139, 212, 0.25);
-  background: rgba(91, 45, 142, 0.04);
+  margin: 26px 0;
+  padding: 14px 24px;
+  border-left: 1px solid var(--accent-line);
+  background: linear-gradient(to right, rgba(91, 45, 142, 0.08), transparent 85%);
   border-radius: 0 var(--radius) var(--radius) 0;
   font-style: italic;
-  color: rgba(232, 232, 237, 0.85);
+  color: var(--text);
+}
+
+.postContent blockquote p:last-child {
+  margin-bottom: 0;
+}
+
+.postContent hr {
+  border: 0;
+  height: 1px;
+  margin: 36px auto;
+  width: min(220px, 60%);
+  background: linear-gradient(to right, transparent, var(--rule), transparent);
 }
 
 .postContent ul, .postContent ol {
-  margin: 16px 0;
+  margin: 16px 0 22px;
   padding-left: 28px;
 }
 
@@ -546,6 +749,10 @@ main.container {
   list-style: none;
 }
 
+.postContent li + li {
+  margin-top: 4px;
+}
+
 .postContent li::before {
   display: inline-block;
   min-width: 1.2em;
@@ -553,6 +760,7 @@ main.container {
   margin-right: 0.3em;
   text-align: right;
   white-space: nowrap;
+  color: var(--muted);
 }
 
 .postContent ul > li::before { content: "\2022"; }
@@ -580,24 +788,34 @@ main.container {
 .postContent ol > li.ql-indent-8 { counter-increment: list-8; counter-reset: none; }
 .postContent ol > li.ql-indent-8::before { content: counter(list-8, lower-roman) ". "; }
 
-/* Colors pasted from Word/Docs (black or white spans) would be unreadable on
-   the dark page; post text always uses the site colors. */
-.postContent span[style] {
-  color: inherit !important;
-  background-color: transparent !important;
-}
-
 .postContent a {
   color: var(--accent);
   text-decoration: underline;
-  text-underline-offset: 3px;
-  text-decoration-color: rgba(168, 139, 212, 0.3);
-  transition: text-decoration-color 0.2s;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.2em;
+  text-decoration-color: var(--accent-line);
+  transition: color 0.2s, text-decoration-color 0.2s;
 }
 
 .postContent a:hover {
-  color: var(--text);
-  text-decoration-color: var(--text);
+  color: var(--ivory);
+  text-decoration-color: var(--ivory);
+}
+
+/* Colors pasted from Word/Docs (black, white or blue text, white boxes) would
+   be unreadable on the dark page, so post text always uses the site colors. */
+.postContent [style*="color"],
+.postContent font[color] {
+  color: inherit !important;
+}
+
+.postContent [style*="background"] {
+  background-color: transparent !important;
+}
+
+.postContent a[style*="color"],
+.postContent a [style*="color"] {
+  color: var(--accent) !important;
 }
 
 .postContent pre {
@@ -607,7 +825,7 @@ main.container {
   padding: 16px;
   border-radius: var(--radius);
   border: 1px solid var(--border);
-  background: rgba(0, 0, 0, 0.2);
+  background: rgba(0, 0, 0, 0.22);
   font-family: "SF Mono", "Fira Code", "Fira Mono", "Roboto Mono", monospace;
   font-size: 13px;
   line-height: 1.55;
@@ -619,12 +837,12 @@ main.container {
   font-size: 14px;
   padding: 2px 6px;
   border-radius: 4px;
-  background: rgba(255, 255, 255, 0.06);
+  background: rgba(241, 235, 221, 0.06);
 }
 
 /* ── Post footer with PDF link and share ── */
 .postFooter {
-  margin-top: 40px;
+  margin-top: 44px;
   padding-top: 20px;
   border-top: 1px solid var(--border);
   display: flex;
@@ -639,7 +857,7 @@ main.container {
   font-weight: 400;
   color: var(--muted);
   text-decoration: none;
-  letter-spacing: 0.3px;
+  letter-spacing: 0.03em;
   transition: color 0.2s;
 }
 
@@ -651,36 +869,40 @@ main.container {
 .postFooter-divider {
   width: 1px;
   height: 14px;
-  background: var(--border);
+  background: var(--border-hover);
   margin: 0 14px;
   flex-shrink: 0;
 }
 
-.share-btn {
+.share-btn,
+.subscribe-bell-btn {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: 6px;
   background: none;
   border: none;
+  border-radius: 4px;
   cursor: pointer;
   padding: 0;
   font-family: var(--font-sans);
   font-size: 12px;
   font-weight: 400;
   color: var(--muted);
-  letter-spacing: 0.3px;
+  letter-spacing: 0.03em;
   transition: color 0.2s;
   white-space: nowrap;
 }
 
-.share-btn:hover {
+.share-btn:hover,
+.subscribe-bell-btn:hover {
   color: var(--text);
 }
 
-.share-btn svg {
+.share-btn svg,
+.subscribe-bell-btn svg {
   flex-shrink: 0;
+  stroke-width: 1.6;
 }
-
 
 /* ===== Subscribe CTA (Homepage) ===== */
 .subscribe-cta {
@@ -698,7 +920,7 @@ main.container {
   font-family: var(--font-sans);
   font-size: 12px;
   font-weight: 400;
-  letter-spacing: 0.3px;
+  letter-spacing: 0.03em;
 }
 
 .btn.subscribe-cta-btn {
@@ -706,47 +928,24 @@ main.container {
   font-size: 12px;
 }
 
-/* ===== Subscribe Bell Button (Post Footer) ===== */
-.subscribe-bell-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  background: none;
-  border: none;
-  cursor: pointer;
-  padding: 0;
-  font-family: var(--font-sans);
-  font-size: 12px;
-  font-weight: 400;
-  color: var(--muted);
-  letter-spacing: 0.3px;
-  transition: color 0.2s;
-  white-space: nowrap;
-}
-
-.subscribe-bell-btn:hover {
-  color: var(--text);
-}
-
-.subscribe-bell-btn svg {
-  flex-shrink: 0;
-}
-
 /* ===== Subscribe Modal ===== */
 .modal-box.subscribe-modal-box {
   max-width: 400px;
-  background: var(--surface);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6), 0 2px 8px rgba(0, 0, 0, 0.4);
+  padding: 30px 32px 28px;
 }
 
 .subscribe-modal-title {
   font-family: var(--font-serif);
-  font-size: 22px;
+  font-size: 24px;
   font-weight: 500;
+  letter-spacing: 0.02em;
   text-align: center;
+  margin-bottom: 10px;
+  color: var(--ivory);
+}
+
+.subscribe-modal-box .ornament {
   margin-bottom: 20px;
-  color: var(--text);
 }
 
 .subscribe-modal-body .form-input {
@@ -755,10 +954,10 @@ main.container {
 
 .subscribe-error {
   display: none;
-  color: #e07070;
+  color: var(--danger);
   font-family: var(--font-sans);
   font-size: 12px;
-  margin: 4px 0 0;
+  margin: 6px 0 0;
   text-align: left;
 }
 
@@ -767,9 +966,9 @@ main.container {
 }
 
 .subscribe-success p {
-  font-family: var(--font-sans);
-  font-size: 14px;
-  line-height: 1.6;
+  font-family: var(--font-serif);
+  font-size: 17px;
+  line-height: 1.65;
   color: var(--text);
   margin: 0;
 }
@@ -787,17 +986,33 @@ main.container {
   transform: translateY(-1px);
 }
 
-/* ===== Footer ===== */
+/* ===== Footer: a colophon under a small ornament ===== */
 .footer {
-  padding: 32px 0 40px;
+  padding: 0 0 40px;
   text-align: center;
   color: var(--muted);
   font-size: 11px;
   font-family: var(--font-sans);
   font-weight: 400;
-  letter-spacing: 0.3px;
-  border-top: 1px solid var(--border);
+  letter-spacing: 0.04em;
   margin-top: 20px;
+}
+
+.footer .ornament {
+  margin-bottom: 22px;
+}
+
+.footer .ornament::before,
+.footer .ornament::after {
+  flex-basis: 260px;
+}
+
+.footer-site {
+  font-family: var(--font-serif);
+  font-size: 13.5px;
+  font-style: italic;
+  letter-spacing: 0.01em;
+  color: var(--text-soft);
 }
 
 /* ===== Buttons ===== */
@@ -807,23 +1022,23 @@ main.container {
   justify-content: center;
   gap: 8px;
   border-radius: var(--radius);
-  border: 1px solid var(--border);
-  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(241, 235, 221, 0.11);
+  background: rgba(241, 235, 221, 0.035);
   color: var(--text);
   padding: 10px 18px;
   cursor: pointer;
   font-family: var(--font-sans);
   font-size: 13px;
   font-weight: 400;
-  letter-spacing: 0.2px;
+  letter-spacing: 0.02em;
   text-decoration: none;
   transition: border-color 0.2s, background 0.2s, transform 0.15s;
   line-height: 1;
 }
 
 .btn:hover {
-  border-color: var(--border-hover);
-  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(241, 235, 221, 0.2);
+  background: rgba(241, 235, 221, 0.06);
   text-decoration: none;
   transform: translateY(-1px);
 }
@@ -836,21 +1051,28 @@ main.container {
 .btn.primary {
   background: var(--purple-soft);
   border-color: var(--purple-border);
+  color: var(--ivory);
 }
 
 .btn.primary:hover {
-  background: rgba(91, 45, 142, 0.12);
-  border-color: rgba(91, 45, 142, 0.3);
+  background: rgba(91, 45, 142, 0.22);
+  border-color: rgba(150, 112, 204, 0.5);
 }
 
 .btn.danger {
-  border-color: rgba(200, 50, 50, 0.25);
-  color: #e07070;
+  border-color: rgba(214, 92, 80, 0.3);
+  color: var(--danger);
 }
 
 .btn.danger:hover {
-  background: rgba(200, 50, 50, 0.06);
-  border-color: rgba(200, 50, 50, 0.35);
+  background: rgba(214, 92, 80, 0.08);
+  border-color: rgba(214, 92, 80, 0.45);
+}
+
+.btn:disabled {
+  opacity: 0.55;
+  cursor: default;
+  transform: none;
 }
 
 /* ===== Modal ===== */
@@ -858,23 +1080,28 @@ main.container {
   display: none;
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.75);
+  background: rgba(8, 7, 7, 0.74);
   z-index: 1000;
   align-items: center;
   justify-content: center;
-  backdrop-filter: blur(2px);
-  -webkit-backdrop-filter: blur(2px);
+  padding: 16px;
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
 }
 .modal-overlay.active {
   display: flex;
 }
 .modal-box {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
+  position: relative;
+  background-color: var(--surface);
+  background-image: url("/public/img/grain.png");
+  background-image: image-set(url("/public/img/grain.png") 1x, url("/public/img/grain.png") 2x);
+  border: 1px solid rgba(241, 235, 221, 0.1);
+  border-radius: var(--radius-lg);
+  box-shadow: inset 0 1px 0 rgba(255, 250, 240, 0.04), 0 12px 40px rgba(0, 0, 0, 0.55), 0 2px 8px rgba(0, 0, 0, 0.35);
   padding: 28px 32px;
   max-width: 420px;
-  width: 90%;
+  width: 100%;
   text-align: center;
 }
 .modal-message {
@@ -888,21 +1115,22 @@ main.container {
 }
 .modal-post-name {
   font-family: var(--font-serif);
-  font-size: 16px;
+  font-size: 17px;
   font-weight: 500;
-  color: var(--text);
+  color: var(--ivory);
   margin: 0 0 8px;
   overflow-wrap: break-word;
 }
 .modal-actions {
   display: flex;
   justify-content: center;
+  flex-wrap: wrap;
   gap: 10px;
-  margin-top: 20px;
+  margin-top: 22px;
 }
 .modal-error {
   display: none;
-  color: #e07070;
+  color: var(--danger);
   font-family: var(--font-sans);
   font-size: 12px;
   margin: 8px 0 0;
@@ -923,18 +1151,23 @@ main.container {
   width: 100%;
   padding: 10px 14px;
   border-radius: var(--radius);
-  border: 1px solid var(--border);
-  background: rgba(0, 0, 0, 0.18);
+  border: 1px solid rgba(241, 235, 221, 0.1);
+  background: rgba(0, 0, 0, 0.2);
   color: var(--text);
   font-family: var(--font-sans);
   font-size: 13px;
   font-weight: 400;
-  transition: border-color 0.2s;
+  transition: border-color 0.2s, box-shadow 0.2s;
   outline: none;
+}
+
+.form-input:hover {
+  border-color: rgba(241, 235, 221, 0.16);
 }
 
 .form-input:focus {
   border-color: var(--focus-ring);
+  box-shadow: 0 0 0 3px rgba(168, 139, 212, 0.14);
 }
 
 .form-input:focus-visible {
@@ -943,13 +1176,18 @@ main.container {
 }
 
 .form-input::placeholder {
-  color: var(--muted);
-  opacity: 0.6;
+  color: var(--placeholder);
+  opacity: 1;
 }
 
 select.form-input {
   cursor: pointer;
   appearance: auto;
+}
+
+select.form-input option {
+  background: var(--surface);
+  color: var(--text);
 }
 
 textarea.form-input {
@@ -966,7 +1204,7 @@ textarea.form-input {
   font-size: 12px;
   font-weight: 400;
   margin-bottom: 6px;
-  letter-spacing: 0.3px;
+  letter-spacing: 0.03em;
 }
 
 .form-hint {
@@ -975,7 +1213,6 @@ textarea.form-input {
   font-size: 11px;
   font-weight: 400;
   margin-top: 4px;
-  opacity: 0.6;
 }
 
 /* Text fields at 16px or more on phones and touch tablets, so iOS Safari
@@ -992,7 +1229,7 @@ textarea.form-input {
   padding: 20px;
   border-radius: var(--radius);
   border: 1px solid var(--border);
-  background: rgba(0, 0, 0, 0.1);
+  background: rgba(0, 0, 0, 0.12);
   text-align: center;
 }
 
@@ -1001,7 +1238,7 @@ textarea.form-input {
   font-family: var(--font-sans);
   font-size: 11px;
   font-weight: 400;
-  letter-spacing: 0.4px;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
 }
 
@@ -1009,16 +1246,29 @@ textarea.form-input {
   font-size: 28px;
   font-weight: 500;
   font-family: var(--font-sans);
+  font-variant-numeric: tabular-nums;
+  color: var(--ivory);
   margin-top: 6px;
+}
+
+/* Small counts beside a post title in the admin list */
+.post-stats {
+  margin-left: 8px;
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--muted);
+  letter-spacing: 0.02em;
+  white-space: nowrap;
 }
 
 /* ===== Success / Alert ===== */
 .alert-success {
   padding: 12px 16px;
   border-radius: var(--radius);
-  background: rgba(50, 160, 80, 0.06);
-  border: 1px solid rgba(50, 160, 80, 0.2);
-  color: #6ccf8a;
+  background: rgba(70, 160, 95, 0.08);
+  border: 1px solid rgba(110, 190, 130, 0.25);
+  color: var(--success);
   font-family: var(--font-sans);
   font-size: 13px;
   font-weight: 400;
@@ -1030,9 +1280,9 @@ textarea.form-input {
 .alert-error {
   padding: 12px 16px;
   border-radius: var(--radius);
-  background: rgba(200, 50, 50, 0.06);
-  border: 1px solid rgba(200, 50, 50, 0.2);
-  color: #e07070;
+  background: rgba(214, 92, 80, 0.08);
+  border: 1px solid rgba(214, 92, 80, 0.26);
+  color: var(--danger);
   font-family: var(--font-sans);
   font-size: 13px;
   font-weight: 400;
@@ -1051,7 +1301,7 @@ textarea.form-input {
   font-family: var(--font-sans);
   font-size: 13px;
   font-weight: 400;
-  letter-spacing: 0.3px;
+  letter-spacing: 0.03em;
   flex-wrap: wrap;
 }
 
@@ -1067,19 +1317,60 @@ textarea.form-input {
   font-family: var(--font-sans);
   font-size: 13px;
   font-weight: 400;
+  letter-spacing: inherit;
   text-decoration: none;
 }
 
 .admin-nav a:hover, .admin-nav button:hover {
   color: var(--text);
-  border-color: rgba(255, 255, 255, 0.06);
+  border-color: var(--border);
   text-decoration: none;
 }
 
 .admin-nav a.active {
-  color: var(--text);
+  color: var(--ivory);
   border-color: var(--purple-border);
   background: var(--purple-soft);
+}
+
+.admin-nav-form {
+  display: inline;
+  margin: 0;
+}
+
+/* ===== Admin welcome loader ===== */
+.welcome-loader {
+  width: 80px;
+  height: 80px;
+  position: relative;
+}
+
+.welcome-loader svg {
+  position: absolute;
+  inset: 0;
+}
+
+.welcome-loader circle {
+  fill: none;
+  stroke-width: 3;
+}
+
+.welcome-loader .loader-track { stroke: #34312d; }
+.welcome-loader .loader-arc { stroke: var(--purple); stroke-linecap: round; }
+
+.welcome-bar {
+  width: 100%;
+  height: 4px;
+  border-radius: 999px;
+  background: #34312d;
+  overflow: hidden;
+}
+
+.welcome-bar > div {
+  height: 100%;
+  width: 0%;
+  background: var(--purple);
+  border-radius: 999px;
 }
 
 /* ===== Dividers ===== */
@@ -1099,7 +1390,31 @@ textarea.form-input {
   font-size: 13px;
 }
 
+/* ===== Page not found ===== */
+.not-found {
+  text-align: center;
+  padding-top: 44px;
+  padding-bottom: 44px;
+}
+
+.not-found .listTitle {
+  margin-bottom: 12px;
+}
+
+.not-found .ornament {
+  margin-bottom: 22px;
+}
+
+.not-found .muted {
+  max-width: 420px;
+  margin: 0 auto 26px;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
 /* ===== Focus Rings (global) ===== */
+/* The outline follows each control's own corners: buttons, fields and cards
+   keep their 8px, the nav its pill. */
 a:focus-visible,
 button:focus-visible,
 input:focus-visible,
@@ -1108,6 +1423,19 @@ textarea:focus-visible,
 [tabindex]:focus-visible {
   outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
+}
+
+/* Only links and buttons with no corners of their own (links in running text,
+   the editor toolbar) get a soft 3px one. :where() keeps this at zero
+   specificity, so any rule that sets a radius wins. */
+:where(a, button, [tabindex]):where(:focus-visible) {
+  border-radius: 3px;
+}
+
+/* The post editor is a text field too: ring its writing area like .form-input */
+.ql-container.ql-snow:focus-within {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: -1px;
 }
 
 /* ===== Responsive ===== */
@@ -1169,7 +1497,7 @@ textarea:focus-visible,
   }
 
   .postTitle {
-    font-size: 26px;
+    font-size: 28px;
   }
 
   .postContent {
@@ -1228,6 +1556,10 @@ textarea:focus-visible,
     padding: 22px 16px;
   }
 
+  .card::before {
+    inset: 4px;
+  }
+
   .home-illustration {
     max-width: 180px;
     margin: 12px auto 16px;
@@ -1238,9 +1570,22 @@ textarea:focus-visible,
     gap: 10px;
   }
 
+  .listPage .postRow {
+    padding: 16px 40px 16px 18px;
+  }
+
+  .listPage .postRow::before {
+    right: 18px;
+  }
+
+  .post-stats {
+    display: block;
+    margin: 4px 0 0;
+  }
+
   .latest a {
-    font-size: 16px;
-    padding: 10px 16px;
+    font-size: 17px;
+    padding: 11px 18px;
   }
 
   .postShell {
@@ -1248,12 +1593,29 @@ textarea:focus-visible,
   }
 
   .postTitle {
-    font-size: 23px;
+    font-size: 25px;
+  }
+
+  .postRule {
+    margin: 24px 0 26px;
   }
 
   .postContent {
-    font-size: 16px;
+    font-size: 17px;
     line-height: 1.9;
+  }
+
+  .postContent .pdf-ref-heading {
+    margin-top: 44px;
+  }
+
+  .postContent .pdf-ref-entry {
+    padding-left: 1.5em;
+    text-indent: -1.5em;
+  }
+
+  .postContent blockquote {
+    padding: 12px 16px;
   }
 
   .postContent .ql-indent-1 { padding-left: 1.25em; }
@@ -1276,7 +1638,25 @@ textarea:focus-visible,
 
   .postMeta {
     flex-wrap: wrap;
-    gap: 5px;
+    gap: 6px 8px;
+  }
+
+  .modal-box,
+  .modal-box.subscribe-modal-box {
+    padding: 26px 20px 22px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    transition-duration: 0.01ms !important;
+  }
+
+  .btn:hover,
+  .latest a:hover,
+  .postRow:hover,
+  .stat-card-link:hover {
+    transform: none;
   }
 }
 
@@ -1286,7 +1666,7 @@ textarea:focus-visible,
     color-scheme: light;
   }
 
-  /* Plain black on white; the grain overlay alone would add megabytes per page */
+  /* Plain black on white, without the paper grain */
   *, *::before, *::after {
     color: #000 !important;
     background: transparent !important;
@@ -1303,10 +1683,6 @@ textarea:focus-visible,
     min-height: 0;
   }
 
-  body::before {
-    display: none;
-  }
-
   /* Site chrome and controls */
   .nav,
   .hamburger,
@@ -1315,13 +1691,15 @@ textarea:focus-visible,
   .postFooter,
   .subscribe-cta,
   .modal-overlay,
+  .ornament:not(.postRule),
+  .card::before,
   button {
     display: none !important;
   }
 
   .topbar {
     padding: 0 0 12px;
-    border-bottom-color: #999;
+    border-bottom: 1px solid #999;
   }
 
   .container,
@@ -1339,9 +1717,9 @@ textarea:focus-visible,
     max-width: none;
   }
 
-  .postRule {
-    height: 0;
-    border-top: 1px solid #999;
+  .postRule::before,
+  .postRule::after {
+    background: #999 !important;
   }
 
   .postContent {
@@ -1355,9 +1733,16 @@ textarea:focus-visible,
 
   .postContent blockquote,
   .postContent pre,
-  .postContent .pdf-ref-heading,
   .notice {
     border-color: #999;
+  }
+
+  .postContent .pdf-ref-heading::before {
+    background: #999 !important;
+  }
+
+  .postContent .pdf-ref-heading::after {
+    display: none;
   }
 
   .postContent h1, .postContent h2, .postContent h3, .postContent h4,

@@ -11,6 +11,7 @@ import { parseDocument } from "htmlparser2";
 import { Element, Text } from "domhandler";
 import render from "dom-serializer";
 import { splitSentences, limitLength } from "./text.js";
+import { referenceLabel } from "../post-format.js";
 
 const SKIP = new Set([
   "script", "style", "code", "pre", "kbd", "samp", "var", "svg", "math", "textarea", "select",
@@ -53,6 +54,7 @@ function looksUntranslatable(text) {
   URL_RE.lastIndex = 0;
   const m = URL_RE.exec(t);
   if (m && m[0].length === t.length) return true;
+  if (/^(?:\[[^\]]*\]\s*)+$/.test(t)) return true; // footnote markers such as [USCCB][1]
   return /^[\w-]+(\.[\w-]+)+\/?$/.test(t); // bare domains such as hawking.org.uk
 }
 
@@ -257,13 +259,23 @@ function applySpans(translated, sentence, lookup) {
 /*  Walking the document                                              */
 /* ------------------------------------------------------------------ */
 
-const REFERENCE_HEADING = /^(references|bibliography|works\s+cited|sources|notes|endnotes|footnotes|citations)\s*:?$/i;
-
 const hasClass = (el, name) => new RegExp(`(^|\\s)${name}(\\s|$)`).test(el.attribs?.class || "");
+const hasBreak = (node) => (node.children || []).some((c) => (isTag(c) && c.name === "br") || hasBreak(c));
+const TEXT_BLOCKS = new Set(["p", "h1", "h2", "h3", "h4", "h5", "h6"]);
 
+// The reference list as the post formatter (src/lib/post-format.js) marks it.
+// It starts at a pdf-ref-heading, which the formatter gives every label it
+// takes for the start of the references ("Notes" or "Sources" too, when a
+// citation follows), or at a line of its own reading References,
+// Bibliography, Works Cited or the like. "Notes" or "Sources" without the
+// class is a section of the essay. The list ends at the next heading of the
+// essay (h1-h4 without the class).
 function isReferenceHeading(el) {
-  return hasClass(el, "pdf-ref-heading") || REFERENCE_HEADING.test(textOf(el).replace(/\s+/g, " ").trim());
+  if (hasClass(el, "pdf-ref-heading")) return true;
+  return TEXT_BLOCKS.has(el.name) && !hasBreak(el) && referenceLabel(textOf(el)) === "strong";
 }
+
+const isBodyHeading = (el) => /^h[1-4]$/.test(el.name) && !hasClass(el, "pdf-ref-heading");
 
 /** Bibliography entries stay in their original language. */
 function keepEnglish(el) {
@@ -272,8 +284,8 @@ function keepEnglish(el) {
 
 /**
  * Visit every inline run. `onRun(items, parent, nodes)` may return
- * replacement nodes for the run. Everything after a "References" (or
- * "Bibliography", "Works Cited" …) heading is left untranslated.
+ * replacement nodes for the run. The reference list, from its heading (which
+ * is translated) to the next heading of the essay, is left untranslated.
  */
 function walk(container, onRun, state = { references: false }) {
   const children = container.children || [];
@@ -282,7 +294,7 @@ function walk(container, onRun, state = { references: false }) {
   const flush = () => {
     if (!run.length) return;
     const replacement = onRun(run);
-    next.push(...(replacement || run));
+    for (const node of replacement || run) next.push(node); // no spread: runs can be huge
     run = [];
   };
   for (const child of children) {
@@ -291,6 +303,7 @@ function walk(container, onRun, state = { references: false }) {
       next.push(child);
     } else if (isTag(child) && (BLOCKS.has(child.name) || containsBlock(child))) {
       flush();
+      if (state.references && isBodyHeading(child)) state.references = false;
       if (state.references || hasClass(child, "pdf-ref-entry")) {
         keepEnglish(child);
       } else {
@@ -382,7 +395,7 @@ export function translateHtml(html, lookup) {
         }
         const translated = lookup(s.source);
         const pieces = s.spans.length ? applySpans(translated, s, lookup) : [{ text: translated, marks: s.marks }];
-        items.push(...pieces);
+        for (const piece of pieces) items.push(piece);
       });
       if (trail) items.push({ text: trail, marks: part.tokens[part.tokens.length - 1].marks });
     }

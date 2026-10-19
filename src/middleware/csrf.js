@@ -72,6 +72,25 @@ export function isSameSiteRequest(req) {
 }
 
 /**
+ * Stricter than isSameSiteRequest: the browser must say the request comes
+ * from this site's own page. Every current browser sends Sec-Fetch-Site, or
+ * (older Safari) an Origin header, on a fetch POST, so a request with neither
+ * is a script rather than a page.
+ */
+export function isOwnPageRequest(req) {
+  const site = req.get("sec-fetch-site");
+  if (site) return site === "same-origin";
+  const origin = req.get("origin");
+  if (!origin || origin === "null") return false;
+  try {
+    const url = new URL(origin);
+    return url.protocol === `${req.protocol}:` && url.hostname === req.hostname;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * For public JSON endpoints used by the site's own pages: the request must
  * come from this site and carry a JSON body, which a cross-site form cannot
  * send.
@@ -79,5 +98,12 @@ export function isSameSiteRequest(req) {
 export function sameOriginJson(req, _res, next) {
   if (SAFE_METHODS.has(req.method)) return next();
   if (!isSameSiteRequest(req) || !req.is("application/json")) return next(csrfError());
+  return next();
+}
+
+/** Like sameOriginJson, but a request must show it comes from a page here. */
+export function ownPageJson(req, _res, next) {
+  if (SAFE_METHODS.has(req.method)) return next();
+  if (!isOwnPageRequest(req) || !req.is("application/json")) return next(csrfError());
   return next();
 }

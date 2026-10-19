@@ -1,5 +1,5 @@
 // src/routes/admin.js
-import { Router } from "express";
+import express, { Router } from "express";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
@@ -12,6 +12,7 @@ import { requireAdmin } from "../middleware/auth.js";
 import { verifyCsrf } from "../middleware/csrf.js";
 import { ensureUploadsDir, getUploadsDir } from "../lib/uploads.js";
 import { sanitizeRichHtml } from "../lib/sanitize.js";
+import { formatPostHtml } from "../lib/post-format.js";
 import { extractPdfHtml } from "../lib/pdf-text.js";
 import { isValidAdminUser, verifyAdminPassword } from "../lib/security.js";
 import { sendNewPostEmail, sendUnsubscribeConfirmationEmail } from "../lib/email-service.js";
@@ -101,6 +102,10 @@ function makeSlug(title) {
 }
 
 const hasText = (html) => String(html || "").replace(/<[^>]+>/g, "").replace(/&nbsp;/g, " ").trim().length > 0;
+
+// Post bodies are sanitized and formatted (paragraphs, verse, references)
+// whenever they are saved, so new and edited posts always come out the same.
+const postHtml = (raw, options) => formatPostHtml(String(raw || ""), options);
 
 // Body of a PDF post whose PDF has no selectable text (e.g. a scan): the
 // reader opens the original PDF from the post page.
@@ -200,7 +205,7 @@ async function knownPdfPath(raw) {
 async function ingestPdf(file, title = "") {
   try {
     const buffer = await fs.promises.readFile(file.path);
-    const html = await extractPdfHtml(buffer, { title });
+    const html = postHtml(await extractPdfHtml(buffer, { title }), { pdf: true });
     await savePdfToDb(file.filename, file.path);
     return { html, pdfPath: `/uploads/${file.filename}` };
   } catch (err) {
@@ -495,6 +500,19 @@ router.post("/posts/extract-pdf", requireAdmin, pdfUpload, verifyCsrf, async (re
   res.json({ html: result.html, filename: req.file.filename, pdfPath: result.pdfPath });
 });
 
+/* ---------- Auto format (AJAX) ---------- */
+
+// The editor's "Auto format" button: the editor HTML, formatted the way it
+// will be saved. It accepts as much as saving does (the post form's 25 MB
+// field), with room for JSON escaping; server.js leaves this body to it.
+const formatBody = express.json({ limit: "50mb" });
+
+router.post("/posts/format", requireAdmin, formatBody, verifyCsrf, (req, res) => {
+  const source = req.body?.html;
+  if (typeof source !== "string") return res.status(400).json({ error: "No content to format." });
+  res.json({ html: postHtml(source) });
+});
+
 /* ---------- Post create ---------- */
 
 router.get("/posts/new", requireAdmin, (_req, res) => {
@@ -530,13 +548,13 @@ router.post("/posts/create", requireAdmin, pdfUpload, verifyCsrf, async (req, re
     let pdfPath = null;
 
     if (contentMode === "PDF") {
-      const editedHtml = sanitizeRichHtml(String(req.body.contentHtml || ""));
+      const editedHtml = postHtml(req.body.contentHtml, { pdf: true });
       contentType = "PDF";
       if (req.file) {
         // New file uploaded with the form (fallback when the AJAX extraction was not used)
         const result = await ingestPdf(req.file, title);
         if (result.errorKey) return fail(422, result.errorKey);
-        contentHtml = hasText(editedHtml) ? editedHtml : sanitizeRichHtml(result.html);
+        contentHtml = hasText(editedHtml) ? editedHtml : result.html;
         pdfPath = result.pdfPath;
       } else {
         // PDF was already uploaded via AJAX; the admin edited the extracted text
@@ -546,7 +564,7 @@ router.post("/posts/create", requireAdmin, pdfUpload, verifyCsrf, async (req, re
       if (!pdfPath) return fail(400, "errPdfRequired");
       if (!hasText(contentHtml)) contentHtml = PDF_ONLY_HTML;
     } else {
-      contentHtml = sanitizeRichHtml(String(req.body.contentHtml || ""));
+      contentHtml = postHtml(req.body.contentHtml);
       if (!hasText(contentHtml)) return fail(400, "errContentRequired");
     }
 
@@ -624,7 +642,7 @@ router.post("/posts/:id/update", requireAdmin, pdfUpload, verifyCsrf, async (req
 
     if (contentMode === "PDF") {
       contentType = "PDF";
-      const editedHtml = sanitizeRichHtml(String(req.body.contentHtml || ""));
+      const editedHtml = postHtml(req.body.contentHtml, { pdf: true });
       const submittedPdfPath = String(req.body.pdfPath || "").trim();
 
       if (req.file) {
@@ -633,7 +651,7 @@ router.post("/posts/:id/update", requireAdmin, pdfUpload, verifyCsrf, async (req
         if (result.errorKey) return fail(422, result.errorKey);
         ingestedPdfPath = result.pdfPath;
         pdfPath = result.pdfPath;
-        contentHtml = hasText(editedHtml) ? editedHtml : sanitizeRichHtml(result.html);
+        contentHtml = hasText(editedHtml) ? editedHtml : result.html;
       } else if (submittedPdfPath && submittedPdfPath !== existing.pdfPath) {
         // Replaced via the AJAX extraction
         pdfPath = await knownPdfPath(submittedPdfPath);
@@ -647,7 +665,7 @@ router.post("/posts/:id/update", requireAdmin, pdfUpload, verifyCsrf, async (req
       if (!hasText(contentHtml)) contentHtml = PDF_ONLY_HTML;
     } else {
       contentType = "RICH";
-      const richHtml = sanitizeRichHtml(String(req.body.contentHtml || ""));
+      const richHtml = postHtml(req.body.contentHtml);
       if (!hasText(richHtml)) return fail(400, "errContentRequired");
       contentHtml = richHtml;
       pdfPath = null;

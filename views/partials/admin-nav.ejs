@@ -6,10 +6,11 @@
       <a href="/admin/dashboard"<%- current === 'dashboard' ? ' class="active" aria-current="page"' : '' %> data-i18n="dashboard">Dashboard</a>
       <a href="/admin/posts"<%- current === 'posts' ? ' class="active" aria-current="page"' : '' %> data-i18n="posts">Posts</a>
       <a href="/admin/settings"<%- current === 'settings' ? ' class="active" aria-current="page"' : '' %> data-i18n="siteSettings">Site Settings</a>
-      <form method="POST" action="/admin/logout" style="display:inline;margin:0;">
+      <form class="admin-nav-form" method="POST" action="/admin/logout">
         <input type="hidden" name="_csrf" value="<%= csrfToken %>" />
         <button type="submit" data-i18n="logOut">Log out</button>
       </form>
     </nav>
   </div>
 </header>
+<script src="/public/js/admin-nav.js" defer></script>

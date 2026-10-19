@@ -11,7 +11,12 @@
     pdfNoText: "No selectable text was found in this PDF.",
     pdfNotPdf: "Only PDF files can be uploaded.",
     pdfTooLarge: "The PDF is larger than 15 MB.",
-    confirmSwitchToEditor: "Switching to Editor mode removes the original PDF from this post when you save. Continue?"
+    confirmSwitchToEditor: "Switching to Editor mode removes the original PDF from this post when you save. Continue?",
+    autoFormatting: "Formatting…",
+    autoFormatted: "Formatted. Press Ctrl+Z (⌘Z on a Mac) to undo.",
+    autoFormatNoChange: "The formatting is already consistent.",
+    autoFormatEmpty: "There is nothing to format yet.",
+    autoFormatFailed: "The text could not be formatted. Please try again."
   };
 
   // Server error codes from /admin/posts/extract-pdf -> message keys.
@@ -26,6 +31,66 @@
     var lang = window.__i18nLang || "en";
     var entry = ui[key];
     return (entry && (entry[lang] || entry.en)) || FALLBACK[key] || key;
+  }
+
+  // CSRF token from the form (or the page's csrf-token meta tag)
+  function csrfToken() {
+    var input = document.querySelector('#postForm input[name="_csrf"]') || document.querySelector('input[name="_csrf"]');
+    var meta = document.querySelector('meta[name="csrf-token"]');
+    return input ? input.value : (meta ? meta.getAttribute("content") : "");
+  }
+
+  // "Auto format" under each editor: the server formats the editor's HTML the
+  // way it is saved (src/lib/post-format.js) and the result replaces the
+  // editor content as one change that Ctrl/Cmd+Z undoes.
+  function setupAutoFormat(button) {
+    var mode = button.getAttribute("data-auto-format");
+    var status = document.querySelector('[data-auto-format-status="' + mode + '"]');
+    function say(key, isError) {
+      if (!status) return;
+      status.textContent = t(key);
+      status.classList.toggle("error", !!isError);
+    }
+    button.addEventListener("click", function () {
+      var editors = window._postEditors;
+      var editor = editors && editors[mode];
+      if (!editor) return;
+      if (!editor.getText().trim()) return say("autoFormatEmpty", false);
+      var before = editor.root.innerHTML;
+      button.disabled = true;
+      say("autoFormatting", false);
+      fetch("/admin/posts/format", {
+        method: "POST",
+        headers: { "content-type": "application/json", "x-csrf-token": csrfToken() },
+        credentials: "same-origin",
+        body: JSON.stringify({ html: before })
+      })
+        .then(function (resp) {
+          return resp.json().catch(function () { return {}; }).then(function (data) {
+            if (!resp.ok || typeof data.html !== "string") throw new Error("Format failed");
+            return data;
+          });
+        })
+        .then(function (data) {
+          // Typed into the editor while waiting: keep that, try again later.
+          if (editor.root.innerHTML !== before) throw new Error("Edited meanwhile");
+          // Its own undo step, never merged with typing just before or after.
+          editor.history.cutoff();
+          // Quill pastes into the format at the caret, so with the caret in a code
+          // block the whole post would become code: empty the editor first (the two
+          // changes are recorded as one step).
+          editor.setContents([{ insert: "\n" }], "user");
+          editor.clipboard.dangerouslyPasteHTML(editors.unwrapPdfText(data.html), "user");
+          editor.history.cutoff();
+          say(editor.root.innerHTML === before ? "autoFormatNoChange" : "autoFormatted", false);
+        })
+        .catch(function () {
+          say("autoFormatFailed", true);
+        })
+        .then(function () {
+          button.disabled = false;
+        });
+    });
   }
 
   document.addEventListener("DOMContentLoaded", () => {
@@ -101,6 +166,8 @@
       sync();
     }
 
+    document.querySelectorAll("[data-auto-format]").forEach(setupAutoFormat);
+
     // PDF file upload -> AJAX extraction
     if (pdfFileInput) {
       var requestId = 0;
@@ -121,11 +188,6 @@
           return;
         }
 
-        // Get CSRF token from the form (or the page's csrf-token meta tag)
-        var csrfInput = document.querySelector('#postForm input[name="_csrf"]') ||
-          document.querySelector('input[name="_csrf"]');
-        var csrfMeta = document.querySelector('meta[name="csrf-token"]');
-        var csrfToken = csrfInput ? csrfInput.value : (csrfMeta ? csrfMeta.getAttribute("content") : "");
         var titleInput = document.querySelector('input[name="title"]');
         var thisRequest = ++requestId;
 
@@ -138,7 +200,7 @@
 
         fetch("/admin/posts/extract-pdf", {
           method: "POST",
-          headers: { "x-csrf-token": csrfToken },
+          headers: { "x-csrf-token": csrfToken() },
           credentials: "same-origin",
           body: formData
         })

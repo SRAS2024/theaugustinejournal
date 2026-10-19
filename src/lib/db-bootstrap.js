@@ -15,7 +15,8 @@ const EXPECTED_TABLES = [
   "SiteSettings",
   "Notice",
   "Post",
-  "post_views",
+  "post_views", // legacy view history, no longer written
+  "post_reads",
   "PdfFile",
   "Subscriber",
   "email_logs",

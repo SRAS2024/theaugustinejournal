@@ -6,6 +6,8 @@ import fs from "fs";
 import path from "path";
 
 import { extractPdfHtml, pdfTextToHtml } from "../src/lib/pdf-text.js";
+import { formatPostHtml } from "../src/lib/post-format.js";
+import { plainText } from "../src/lib/translation/html.js";
 
 /* ------------------------------------------------------------------ */
 /*  Helpers                                                            */
@@ -502,4 +504,38 @@ describe("extractPdfHtml on printed PDF fixtures", () => {
       assert.deepEqual(blocksOf(await extractPdfHtml(read(".pdf"), options)), expected);
     });
   }
+});
+
+/* ------------------------------------------------------------------ */
+/*  Saving an import: post-format.js                                   */
+/* ------------------------------------------------------------------ */
+
+// Every word, in order, with all whitespace removed.
+const letters = (html) => plainText(html).replace(/\s+/g, "");
+
+async function importedHtml() {
+  const html = [await extractPdfHtml(buildPdf(samplePdf()))];
+  if (fs.existsSync(FIXTURES)) {
+    for (const f of fs.readdirSync(FIXTURES).filter((name) => name.endsWith(".pdf")).sort()) {
+      html.push(await extractPdfHtml(fs.readFileSync(path.join(FIXTURES, f))));
+    }
+  }
+  return html;
+}
+
+describe("formatPostHtml on imported PDFs", () => {
+  test("keeps the import's structure and only gathers the verse lines", async () => {
+    const formatted = formatPostHtml(await extractPdfHtml(buildPdf(samplePdf())));
+    const verse = SAMPLE_EXPECTED.slice(9, 13).map((b) => b.text).join("<br />");
+    const expected = [...SAMPLE_EXPECTED.slice(0, 9), p(verse), ...SAMPLE_EXPECTED.slice(13)];
+    assert.deepEqual(blocksOf(formatted), expected);
+  });
+
+  test("never changes the words and is idempotent", async () => {
+    for (const html of await importedHtml()) {
+      const once = formatPostHtml(html);
+      assert.equal(letters(once), letters(html));
+      assert.equal(formatPostHtml(once), once);
+    }
+  });
 });

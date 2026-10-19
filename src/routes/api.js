@@ -6,8 +6,12 @@ import { getPrisma } from "../lib/db.js";
 import { normalizeLang } from "../lib/languages.js";
 import { getTranslations } from "../lib/translation/service.js";
 import { validUnsubscribeToken, confirmToken, validConfirmToken } from "../lib/unsubscribe.js";
-import { sameOriginJson, isSameSiteRequest } from "../middleware/csrf.js";
+import { sameOriginJson, ownPageJson, isSameSiteRequest } from "../middleware/csrf.js";
 import { sendSubscribeConfirmationEmail, sendUnsubscribeConfirmationEmail } from "../lib/email-service.js";
+import {
+  verifyReadTicket, normalizeDeviceId, deviceIdFromCookie, readerKey, networkTag, isLikelyBot, recordRead,
+  DEVICE_COOKIE, DEVICE_COOKIE_MAX_AGE_MS
+} from "../lib/reads.js";
 
 const router = Router();
 
@@ -42,6 +46,49 @@ router.post("/posts/:id/share", sameOriginJson, async (req, res) => {
   } catch (err) {
     console.error("[api/share] failed:", err?.message || err);
     return res.status(500).json({ success: false });
+  }
+});
+
+/* ── Read counter ── */
+// Posted by public/js/reads.js once the reader has spent the post's reading
+// time on the page and scrolled (see src/lib/reads.js). Each device counts
+// once per post, each network at most NETWORK_READS_PER_DAY times a day; the
+// author's own reads are not counted. Requests that do not come from a page
+// here are refused before the limiter, so they cannot use up a reader's quota.
+const readLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 120,
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: (_req, res) => res.status(429).json({ counted: false })
+});
+
+router.post("/posts/:id/read", ownPageJson, readLimiter, async (req, res) => {
+  res.set("Cache-Control", "no-store");
+  try {
+    const postId = String(req.params.id);
+    const userAgent = String(req.get("user-agent") || "");
+    const device = normalizeDeviceId(req.body?.device) || deviceIdFromCookie(req.headers.cookie);
+    if (device) {
+      // Set by the server as well, so browsers that expire script-set
+      // cookies early (Safari) still recognise the device.
+      res.cookie(DEVICE_COOKIE, device, { maxAge: DEVICE_COOKIE_MAX_AGE_MS, path: "/", sameSite: "lax", secure: req.secure });
+    }
+
+    const ticket = verifyReadTicket(req.body?.ticket, postId);
+    if (!ticket.ok || req.session?.admin?.isLoggedIn || isLikelyBot(userAgent)) {
+      return res.json({ counted: false });
+    }
+    const counted = await recordRead(getPrisma(), {
+      postId,
+      ticket: req.body.ticket,
+      readerKey: readerKey({ postId, device, ip: req.ip, userAgent }),
+      networkTag: networkTag({ postId, ip: req.ip })
+    });
+    return res.json({ counted });
+  } catch (err) {
+    console.error("[api/read] failed:", err?.message || err);
+    return res.status(500).json({ counted: false });
   }
 });
 

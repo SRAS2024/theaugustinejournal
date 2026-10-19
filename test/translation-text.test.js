@@ -9,7 +9,8 @@ import {
   sentenceCase,
   buildCaseStats,
   polishTranslation,
-  looksBroken
+  looksBroken,
+  addsToSource
 } from "../src/lib/translation/text.js";
 
 const texts = (s) => splitSentences(s).map((x) => x.text);
@@ -191,5 +192,43 @@ describe("review regressions", () => {
 
   test("German Paraklet also for the Advocate rewrite", () => {
     assert.equal(polishTranslation("Christ promised the Advocate.", "Christus versprach den Paraclete.", "de"), "Christus versprach den Paraklet.");
+  });
+});
+
+describe("additions the models invent", () => {
+  test("asides, citations and Islamic wording the English does not have are caught", () => {
+    const added = [
+      ["The prophet writes of one who would be spurned.", "Пророк (мир ему и благословение Аллаха) пишет о том, кто будет отвергнут."],
+      ["Abraham and Isaac point toward Him.", "Ибрахим (Авраам) и Исхак (Исаак)."],
+      ["Abraham and Isaac point toward Him.", "Ибрахим и Исхак указывают на Него."],
+      ["That belongs to God alone.", "Cela n’appartient qu’à Allah."],
+      ["God is love.", "Alá es amor."],
+      ["Jesus said, “For judgment I am come.”", "Иисус сказал: «Для суда Я пришел» (Ин."],
+      ["Confess your sins: “Pray one for another.”", "Confessez vos péchés : « Priez les uns pour les autres. » (Hébreux 10:3)."],
+      ["[USCCB][1]", "[USCCB][1] (англ.)"],
+      ["“The darkness has not overcome it” (John 1:1, 5, DRA).", "«Тьма не одолела его» (Иоанна 1:5)."],
+      ["(cf. Job 2:1-2, RSV-2CE).", "(ср. Иов 2:2-2, RSV-2CE)."]
+    ];
+    for (const [source, output] of added) {
+      assert.equal(addsToSource(source, output), true, output);
+      assert.equal(looksBroken(source, output), true, output);
+    }
+  });
+
+  test("faithful translations are not flagged", () => {
+    const fine = [
+      ["The Qur’an identifies Him as a prophet.", "Le Coran L’identifie comme un prophète."],
+      ["“And the light shines in darkness” (John 1:5).", "«И свет светит во тьме» (Иоанна 1:5)."],
+      ["Moses led them out of Egypt, and Isaac was his son.", "Моисей вывел их из Египта, а Исаак был его сыном."],
+      ["Mass begins at 10:30.", "La messe commence à 10:30."],
+      ["(cf. Job 2:1-2, RSV-2CE).", "(vgl. Hiob 2,1-2, RSV-2CE)."],
+      ["God is love.", "Dios es amor."],
+      ["That is the heart of the matter.", "В этом суть дела."]
+    ];
+    for (const [source, output] of fine) assert.equal(looksBroken(source, output), false, output);
+  });
+
+  test("French hyphenated pronouns are joined back", () => {
+    assert.equal(polishTranslation("Christ himself said it.", "Le Christ lui- même l’a dit.", "fr"), "Le Christ lui-même l’a dit.");
   });
 });

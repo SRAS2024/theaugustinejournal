@@ -32,8 +32,9 @@ const LIGATURES = {
 };
 
 // A References / Bibliography / Works Cited heading (also in the site's other
-// languages). Matched against a whole one-line block.
-const REF_HEADING_RE = new RegExp(
+// languages). Matched against a whole one-line block. Also used by
+// post-format.js.
+export const REF_HEADING_RE = new RegExp(
   "^(?:references|reference list|bibliography|select bibliography|works?\\s*cited|sources(?:\\s+cited)?" +
   "|referencias|bibliograf[ií]a|refer[eê]ncias|r[ée]f[ée]rences|bibliographie" +
   "|literatur(?:verzeichnis)?|quellen(?:verzeichnis)?|список литературы|литература|источники)$",
@@ -102,15 +103,15 @@ function isAllCaps(text) {
 }
 
 // "On the Restless Heart", "Memory and Time": every significant word is
-// capitalised.
-function isTitleCase(text) {
+// capitalised. Also used by post-format.js.
+export function isTitleCase(text) {
   const words = letterWords(text);
   if (!words.length) return false;
   return words.every((w, i) => /^\p{Lu}/u.test(w) || (i > 0 && SMALL_WORDS.has(w.toLowerCase())));
 }
 
 // Leading section numbers ("1.", "2.3", "IV.") are ignored by the heading tests.
-function stripEnumerator(text) {
+export function stripEnumerator(text) {
   return text.replace(/^(?:\d+(?:\.\d+)*\.?|[IVXLC]+\.)\s+(?=\p{L})/u, "");
 }
 

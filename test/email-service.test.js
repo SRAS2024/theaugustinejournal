@@ -4,6 +4,7 @@
 // Run: node --test test/email-service.test.js
 import { test, describe, before, after } from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 
 import {
   SUPPORTED_LANGS,
@@ -215,7 +216,9 @@ describe("buildEmailHtml", () => {
     assert.ok(!html.includes("<b>this</b>"));
     assert.ok(!html.includes(`"onmouseover="`));
     assert.ok(html.includes("<title>&lt;Subject&gt;</title>"));
-    assert.ok(html.includes("Read &lt;b&gt;this&lt;/b&gt; &amp; that</p>"));
+    // the message's last two words are joined by a no-break space (no lone word on a phone's
+    // last line); the post title is left as it is (see "no-widow joining" below)
+    assert.ok(html.includes("Read &lt;b&gt;this&lt;/b&gt; &amp;\u00a0that</p>"));
     assert.ok(html.includes(`>${escapeHtml(nasty)}</a>`));
     assert.ok(html.includes(`href="${SITE}/post/a&quot;onmouseover=&quot;alert(1)"`));
     assert.ok(html.includes(`href="${SITE}/api/unsubscribe?email=a%40b.com&amp;lang=fr"`));
@@ -224,7 +227,7 @@ describe("buildEmailHtml", () => {
   });
 
   test("uses the PNG cathedral with translated alt text and the language", () => {
-    assert.ok(html.includes(`<img src="${SITE}/public/icons/cathedral-email.png" alt="Cathédrale" width="260" height="140"`));
+    assert.ok(html.includes(`<img src="${SITE}/public/icons/cathedral-email-ivory.png" alt="Cathédrale" width="260" height="140"`));
     assert.ok(!html.includes(".svg"));
     assert.ok(html.includes('<html lang="fr"'));
     assert.ok(html.includes(">Le Journal augustinien</h1>"));
@@ -241,10 +244,203 @@ describe("buildEmailHtml", () => {
     assert.ok(ru.includes('alt="Собор"'));
   });
 
-  test("keeps the dark design", () => {
-    for (const fragment of ['bgcolor="#0a0a0e"', "Cormorant Garamond", "max-width:560px", "#2b1c3e", "border-radius:8px"]) {
+  test("keeps the dark design: ivory on charcoal, purple accents, the same fonts", () => {
+    for (const fragment of ['bgcolor="#131211"', "color:#F1EBDD", "#5B2D8E", "Cormorant Garamond", "Inter", "max-width:600px", "border-radius:8px"]) {
       assert.ok(html.includes(fragment), fragment);
     }
+  });
+});
+
+/* ── No lone last word, and nothing wider than a phone ── */
+
+describe("no-widow joining", () => {
+  const messageOf = message => buildSimpleEmailHtml({ subject: "s", message, lang: "de" }).match(/t-message"[^>]*>([^<]*)<\/p>/)[1];
+  const titleOf = postTitle => buildEmailHtml({ subject: "s", message: "m", postTitle, postUrl: "u", lang: "de" }).match(/<a [^>]*tx-ivory[^>]*>([^<]*)<\/a>/)[1];
+
+  test("joins the message's last two words only when they are short together (22 characters)", () => {
+    assert.equal(messageOf("Look at abcdefghijk abcdefghijk"), "Look at abcdefghijk\u00a0abcdefghijk");
+    assert.equal(messageOf("Look at abcdefghijkl abcdefghijk"), "Look at abcdefghijkl abcdefghijk");
+    // a long word before a short last word stays breakable: one run of both would not fit a phone
+    assert.equal(messageOf("Augustinus und die Auferstehungsverheißung Christi"), "Augustinus und die Auferstehungsverheißung Christi");
+    assert.equal(messageOf("Amen"), "Amen");
+    assert.equal(messageOf("Amen "), "Amen ");
+    assert.equal(messageOf("Thanks  all"), "Thanks  all");
+    // a no-break space already in the text counts as part of its word
+    assert.equal(messageOf("Merci pour votre abonnement au Journal augustinien\u00a0!"), "Merci pour votre abonnement au Journal\u00a0augustinien\u00a0!");
+  });
+
+  test("never joins the post title, which can be any length", () => {
+    for (const title of ["The Face of God", "Augustinus und die Auferstehungsverheißung Christi", "О достопримечательностях Рима", "Transubstantiation Explained"]) {
+      assert.equal(titleOf(title), escapeHtml(title));
+    }
+    // a no-break space the author typed is kept
+    assert.equal(titleOf("Pourquoi prier\u00a0?"), "Pourquoi prier\u00a0?");
+  });
+
+  test("a word too long for a phone breaks inside the post button instead of widening the card", () => {
+    const html = buildEmailHtml({ subject: "s", message: "m", postTitle: "Donaudampfschifffahrtsgesellschaftskapitän", postUrl: "u", lang: "de" });
+    const style = html.match(/<a [^>]*tx-ivory[^>]*style="([^"]*)"/)[1];
+    assert.ok(style.includes("word-break:break-word;"), style);
+    assert.ok(style.includes("overflow-wrap:break-word;"), style);
+  });
+
+  test("below 360px the card and the post button have less padding, so a long word fits whole", () => {
+    const html = buildEmailHtml({ subject: "s", message: "m", postTitle: "Auferstehungsverheißung", postUrl: "u", lang: "de" });
+    const link = html.match(/<a [^>]*tx-ivory[^>]*>/)[0];
+    assert.match(link, /class="[^"]*\bpad-button\b/);
+    assert.ok(link.includes("padding:14px 28px;"), "the inline padding (every other width) is unchanged");
+    assert.ok(html.includes('class="bg-panel pad-panel"'));
+    // the rules sit in the Gmail block, after the 520px block, which they override and which is unchanged
+    const gmailBlock = html.match(/<style>[\s\S]*?<\/style>/g).find(block => block.includes("u + .body"));
+    const wide = gmailBlock.indexOf("@media screen and (max-width:520px){");
+    const narrow = gmailBlock.indexOf("@media screen and (max-width:374px){");
+    assert.ok(wide > 0 && narrow > wide, "374px block after the 520px block");
+    assert.ok(gmailBlock.slice(wide, narrow).includes(".pad-panel{padding:0 22px 38px!important;}"));
+    assert.ok(!gmailBlock.slice(wide, narrow).includes(".pad-button"));
+    const rules = gmailBlock.slice(narrow, gmailBlock.indexOf("\n}", narrow));
+    assert.ok(rules.includes(".pad-panel{padding:0 16px 38px!important;}"), rules);
+    assert.ok(rules.includes(".pad-button{padding:14px!important;}"), rules);
+  });
+
+  test("every message in the six languages keeps its last two words together", () => {
+    for (const key of ["newPostMessage", "weeklyThrowbackMessage", "subscribedMessage", "unsubscribedMessage"]) {
+      for (const lang of SUPPORTED_LANGS) {
+        const message = EMAIL_STRINGS[key][lang];
+        const space = message.lastIndexOf(" ");
+        const joined = `${message.slice(0, space)}\u00a0${message.slice(space + 1)}`;
+        assert.ok(buildSimpleEmailHtml({ subject: "s", message, lang }).includes(`>${escapeHtml(joined)}</p>`), `${key}.${lang}`);
+      }
+    }
+  });
+});
+
+/* ── Email markup that holds up in every mail app ── */
+
+describe("email markup", () => {
+  const emails = [];
+  for (const lang of SUPPORTED_LANGS) {
+    const unsubscribeUrl = buildUnsubscribeUrl(`reader@${lang}.example`, lang);
+    emails.push(
+      buildEmailHtml({ subject: EMAIL_STRINGS.newPostTitle[lang], message: EMAIL_STRINGS.newPostMessage[lang], postTitle: "The Face of God", postUrl: buildPostUrl("the-face-of-god"), unsubscribeUrl, lang }),
+      buildEmailHtml({ subject: EMAIL_STRINGS.weeklyThrowbackTitle[lang], message: EMAIL_STRINGS.weeklyThrowbackMessage[lang], postTitle: "A Case for God ".repeat(12), postUrl: buildPostUrl("a-case-for-god"), unsubscribeUrl, lang }),
+      buildSimpleEmailHtml({ subject: EMAIL_STRINGS.subscribedSubject[lang], message: EMAIL_STRINGS.subscribedMessage[lang], unsubscribeUrl, lang }),
+      buildSimpleEmailHtml({ subject: EMAIL_STRINGS.unsubscribedSubject[lang], message: EMAIL_STRINGS.unsubscribedMessage[lang], lang })
+    );
+  }
+  const tags = (html, name) => html.match(new RegExp(`<${name}\\b[^>]*>`, "g")) || [];
+  const styleOf = tag => (tag.match(/style="([^"]*)"/) || [])[1] || "";
+
+  test("stays well under Gmail's 102 KB clipping limit", () => {
+    for (const html of emails) assert.ok(Buffer.byteLength(html) < 40 * 1024, `${Buffer.byteLength(html)} bytes`);
+  });
+
+  test("solid hex colours only, and no CSS that mail apps drop", () => {
+    for (const html of emails) {
+      for (const banned of [/rgba?\(/i, /hsla?\(/i, /var\(--/, /display:\s*(flex|grid)/i, /position:\s*(absolute|relative|fixed)/i, /@import/i]) {
+        assert.ok(!banned.test(html), String(banned));
+      }
+      for (const [, value] of html.matchAll(/(?:bgcolor="|[;"]color:|background-color:)([^;"!]*)/g)) {
+        assert.match(value, /^#[0-9A-Fa-f]{6}$/, value);
+      }
+    }
+  });
+
+  test("tables are presentational; images are sized PNGs with alt text", () => {
+    for (const html of emails) {
+      for (const table of tags(html, "table")) {
+        for (const attr of ['role="presentation"', 'cellpadding="0"', 'cellspacing="0"', 'border="0"']) assert.ok(table.includes(attr), `${attr} in ${table}`);
+      }
+      for (const img of tags(html, "img")) {
+        assert.match(img, /src="https:\/\/[^"]+\.png"/);
+        assert.match(img, / alt="[^"]*"/);
+        assert.match(img, / width="\d+" height="\d+"/);
+        assert.match(styleOf(img), /display:block;/);
+        assert.match(styleOf(img), /border:0;/);
+      }
+      for (const td of tags(html, "td")) assert.ok(!/(^|;)margin/.test(styleOf(td)), td);
+      // no CSS url(): Gmail has dropped whole style attributes that contain one
+      assert.ok(!/url\(/.test(html.replace(/<style>[\s\S]*?<\/style>/g, "")), "url() in an inline style");
+      for (const [, src] of html.matchAll(/ background="([^"]*)"/g)) assert.match(src, /^https:\/\/[^"]+\.png$/);
+    }
+  });
+
+  test("the cathedral is fluid up to 260px, so a blocked image never widens a phone", () => {
+    for (const html of emails) {
+      const img = tags(html, "img").find(tag => tag.includes("cathedral-email-ivory.png"));
+      assert.ok(img.includes(' width="260" height="140"'), "Outlook for Windows sizes it from the attributes");
+      assert.ok(styleOf(img).includes("width:100%;max-width:260px;height:auto;"), img);
+      assert.ok(!/(^|;)width:260px/.test(styleOf(img)), img);
+    }
+  });
+
+  test("every text element sets its own colour, font, size and line height", () => {
+    for (const html of emails) {
+      for (const tag of [...tags(html, "h1"), ...tags(html, "p"), ...tags(html, "a")]) {
+        for (const prop of ["color:#", "font-family:", "font-size:", "line-height:"]) assert.ok(styleOf(tag).includes(prop), `${prop} in ${tag}`);
+      }
+    }
+  });
+
+  test("coloured cells carry bgcolor and the same inline colour", () => {
+    for (const html of emails) {
+      for (const tag of html.match(/<(?:td|table|body)\b[^>]*bgcolor="[^"]*"[^>]*>/g)) {
+        const color = tag.match(/bgcolor="([^"]+)"/)[1];
+        assert.ok(styleOf(tag).includes(`background-color:${color};`), tag);
+      }
+    }
+  });
+
+  test("Outlook gets a 600px ghost table, 96 DPI and font fallbacks", () => {
+    const [html] = emails;
+    assert.ok(html.includes('<!--[if mso]><table role="presentation" align="center" width="600"'));
+    assert.ok(html.includes("<o:PixelsPerInch>96</o:PixelsPerInch>"));
+    assert.ok(html.includes("mso-font-alt:Georgia") && html.includes("mso-font-alt:Arial"));
+    assert.ok(html.includes("max-width:600px"));
+    assert.equal((html.match(/<!--\[if/g) || []).length, (html.match(/<!\[endif\]-->/g) || []).length);
+  });
+
+  test("dark modes: color-scheme declared, colours pinned for Gmail and Outlook", () => {
+    for (const html of emails) {
+      assert.ok(html.includes('<meta name="color-scheme" content="light dark">'));
+      assert.ok(html.includes('<meta name="supported-color-schemes" content="light dark">'));
+      assert.ok(html.includes("a[x-apple-data-detectors]"));
+      assert.ok(html.includes('<body class="body"'), "Gmail's u + .body selector needs the class");
+      for (const cls of new Set([...html.matchAll(/class="[^"]*\b(bg-[A-Za-z]+)/g)].map(m => m[1]))) {
+        assert.ok(html.includes(`u + .body .${cls}{background-image:linear-gradient(`), cls);
+        assert.ok(html.includes(`[data-ogsb] .${cls},.${cls}[data-ogsb]{background-color:`), cls);
+      }
+      for (const cls of new Set([...html.matchAll(/class="[^"]*\b(tx-[A-Za-z]+)/g)].map(m => m[1]))) {
+        assert.ok(html.includes(`[data-ogsc] .${cls},.${cls}[data-ogsc]{color:`), cls);
+      }
+      // every text block is wrapped in Gmail's blend layers
+      assert.equal(html.split('<div class="gm-screen"><div class="gm-diff">').length - 1, tags(html, "h1").length + tags(html, "p").length + (html.includes("<!-- Post link -->") ? 1 : 0));
+    }
+  });
+
+  test("Gmail rules stay apart from the selectors Gmail rejects", () => {
+    const [html] = emails;
+    const gmailBlock = html.match(/<style>[\s\S]*?<\/style>/g).find(block => block.includes("u + .body"));
+    assert.ok(gmailBlock);
+    assert.ok(!/\[data-|:root|x-apple|#MessageViewBody/.test(gmailBlock));
+  });
+
+  test("hidden preheader", () => {
+    const [html] = emails;
+    assert.match(html, /<div style="display:none;mso-hide:all;[^"]*max-height:0;[^"]*overflow:hidden;[^"]*">Check out our newest post\. — The Face of God/);
+  });
+
+  test("the artwork exists as 2x PNGs; the old cathedral stays for emails already sent", () => {
+    const pngSize = file => {
+      const buf = readFileSync(new URL(`../public/icons/${file}`, import.meta.url));
+      assert.equal(buf.toString("ascii", 1, 4), "PNG", file);
+      return { width: buf.readUInt32BE(16), height: buf.readUInt32BE(20) };
+    };
+    assert.deepEqual(pngSize("cathedral-email-ivory.png"), { width: 520, height: 280 }); // shown at 260 × 140
+    assert.deepEqual(pngSize("ornament-email.png"), { width: 320, height: 24 }); // shown at 160 × 12
+    assert.ok(pngSize("grain-email.png").width > 0);
+    assert.deepEqual(pngSize("cathedral-email.png"), { width: 520, height: 280 });
+    const [html] = emails;
+    for (const file of ["cathedral-email-ivory.png", "ornament-email.png", "grain-email.png"]) assert.ok(html.includes(`${SITE}/public/icons/${file}`), file);
   });
 });
 

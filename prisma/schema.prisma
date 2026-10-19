@@ -42,6 +42,8 @@ model Post {
   contentType        ContentType
   contentHtml        String      @default("")
   pdfPath            String?     @db.Text
+  /// Number of reads (src/lib/reads.js). The column is still named view_count:
+  /// the views counted before reads existed are kept as the starting number.
   viewCount          Int         @default(0) @map("view_count")
   shareCount         Int         @default(0) @map("share_count")
   autoTranslateTitle Boolean     @default(true) @map("auto_translate_title")
@@ -49,12 +51,15 @@ model Post {
   updatedAt          DateTime    @updatedAt
 
   views     PostView[]
+  reads     PostRead[]
   redirects PostRedirect[]
 
   @@index([type, postDate])
   @@index([postDate])
 }
 
+/// Unique page views from before reads were counted. Kept as history;
+/// nothing writes to it any more.
 model PostView {
   id               String   @id
   postId           String   @map("post_id")
@@ -65,6 +70,27 @@ model PostView {
 
   @@unique([postId, viewerIdentifier])
   @@map("post_views")
+}
+
+/// One row per reader that has read a post (src/lib/reads.js). The reader key
+/// is a keyed hash that includes the post, so rows of different posts cannot
+/// be linked to one reader.
+model PostRead {
+  id         String   @id
+  postId     String   @map("post_id")
+  /// The device (or, without one, the network address and browser)
+  readerKey  String   @map("reader_key")
+  /// SHA-256 of the read ticket that counted this read (a ticket counts once)
+  ticketHash String?  @unique @map("ticket_hash")
+  /// 16-bit keyed tag of the reader's network, for the daily per-network cap
+  networkTag String   @map("network_tag")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@unique([postId, readerKey])
+  @@index([postId, networkTag, createdAt])
+  @@map("post_reads")
 }
 
 model PdfFile {

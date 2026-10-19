@@ -13,10 +13,11 @@
       .ql-container { min-height: 220px; border-radius: 0 0 var(--radius) var(--radius); }
       .ql-toolbar { border-radius: var(--radius) var(--radius) 0 0; }
       .ql-editor { color: var(--text); font-family: var(--font-serif); line-height: 1.7; }
+      .ql-editor p { margin-bottom: 0.9em; } /* paragraph breaks visible while editing (display only) */
       .ql-snow .ql-stroke { stroke: var(--muted); }
       .ql-snow .ql-fill { fill: var(--muted); }
       .ql-snow .ql-picker-label { color: var(--muted); }
-      .ql-snow .ql-picker-options { background: #1a1a22; border-color: var(--border); }
+      .ql-snow .ql-picker-options { background: var(--surface); border-color: var(--border); }
       .ql-snow .ql-picker-item { color: var(--text); }
       #pdfEditorWrap { display: none; margin-top: 16px; }
       #pdfEditorWrap.visible { display: block; }
@@ -49,7 +50,7 @@
         height: 18px;
         left: 3px;
         top: 3px;
-        background: #fff;
+        background: var(--ivory);
         border-radius: 50%;
         transition: transform 0.3s ease;
       }
@@ -67,6 +68,40 @@
         letter-spacing: 0.2px;
       }
       .pdf-extract-status.error { color: #e07070; }
+      /* Under each editor: its hint on the left, Auto format on the right. */
+      .editor-tools {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 8px 16px;
+        flex-wrap: wrap;
+      }
+      /* The status sits left of the button; where both do not fit (a narrow
+         screen, a long translation) it wraps onto its own line under the
+         button, which stays put. */
+      .auto-format {
+        display: flex;
+        flex-wrap: wrap-reverse;
+        justify-content: flex-end;
+        align-items: center;
+        gap: 6px 12px;
+        min-width: 0;
+        max-width: 100%;
+        margin: 10px 0 0 auto;
+      }
+      .auto-format .btn { padding: 8px 14px; font-size: 12px; white-space: nowrap; flex-shrink: 0; }
+      .auto-format .btn:disabled { opacity: 0.55; cursor: progress; transform: none; }
+      .auto-format-status {
+        min-width: 0;
+        max-width: 100%;
+        overflow-wrap: break-word;
+        font-family: var(--font-sans);
+        font-size: 12px;
+        color: var(--muted);
+        letter-spacing: 0.2px;
+        text-align: right;
+      }
+      .auto-format-status.error { color: var(--danger, #e07070); }
     </style>
   </head>
   <body>
@@ -153,7 +188,14 @@
             <span class="form-label" data-i18n="postContent">Post content</span>
             <input id="contentHtml" name="contentHtml" type="hidden" value="<%= p.contentHtml || '' %>" />
             <div id="quillEditor" style="margin-top:6px;"></div>
-            <div class="form-hint" data-i18n="requiredEditorMode">Required in Editor mode</div>
+            <div class="editor-tools">
+              <div class="form-hint" data-i18n="requiredEditorMode">Required in Editor mode</div>
+              <div class="auto-format">
+                <span class="auto-format-status" role="status" data-auto-format-status="RICH"></span>
+                <button class="btn" type="button" data-auto-format="RICH" data-i18n="autoFormat" data-i18n-title="autoFormatHint"
+                  title="Tidies paragraph spacing, keeps verse lines together and formats the references. The words are not changed.">Auto format</button>
+              </div>
+            </div>
           </div>
 
           <div id="pdfWrap" style="display:none;">
@@ -167,7 +209,14 @@
             <div id="pdfEditorWrap">
               <span class="form-label" style="margin-top:16px;" data-i18n="extractedContent">Extracted content (edit below)</span>
               <div id="pdfQuillEditor" style="margin-top:6px;"></div>
-              <div class="form-hint" data-i18n="formatExtractedText">Format the extracted text using the toolbar above. This will be saved as the post content.</div>
+              <div class="editor-tools">
+                <div class="form-hint" data-i18n="formatExtractedText">Format the extracted text using the toolbar above. This will be saved as the post content.</div>
+                <div class="auto-format">
+                  <span class="auto-format-status" role="status" data-auto-format-status="PDF"></span>
+                  <button class="btn" type="button" data-auto-format="PDF" data-i18n="autoFormat" data-i18n-title="autoFormatHint"
+                    title="Tidies paragraph spacing, keeps verse lines together and formats the references. The words are not changed.">Auto format</button>
+                </div>
+              </div>
             </div>
           </div>
 

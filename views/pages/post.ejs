@@ -17,9 +17,9 @@
     </div>
   </header>
 
-  <div class="postRule"></div>
+  <%- include("../partials/ornament", { ornamentClass: "postRule" }) %>
 
-  <article class="postContent" data-translate-key="post:<%= post.id %>:body" data-translate-kind="html">
+  <article class="postContent" data-translate-key="post:<%= post.id %>:body" data-translate-kind="html"<% if (typeof readTicket !== "undefined") { %> data-read-ticket="<%= readTicket %>" data-read-seconds="<%= readSeconds %>"<% } %>>
     <%- post.contentHtml || "" %>
   </article>
 
@@ -43,3 +43,4 @@
 <%- include("../partials/subscribe-modal") %>
 <script src="/public/js/post.js" defer></script>
 <script src="/public/js/subscribe.js" defer></script>
+<script src="/public/js/reads.js" defer></script>

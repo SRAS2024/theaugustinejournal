@@ -29,12 +29,12 @@
 
         <div style="display:grid;gap:8px;">
           <% (posts || []).forEach(function(p) { %>
-            <% const views = p.viewCount || 0; const shares = p.shareCount || 0; %>
+            <% const reads = p.viewCount || 0; const shares = p.shareCount || 0; %>
             <div class="postRow">
               <div>
                 <div class="title" style="margin:0;">
                   <a href="/post/<%= encodeURIComponent(p.slug) %>" target="_blank" rel="noopener noreferrer" translate="no"><%= p.title %></a>
-                  <span style="font-size:11px;color:rgba(138,138,153,0.85);font-family:var(--font-sans);font-weight:400;margin-left:8px;"><span data-i18n-count="viewsCount" data-count="<%= views %>"><%= views %> <%= views === 1 ? 'view' : 'views' %></span> &middot; <span data-i18n-count="sharesCount" data-count="<%= shares %>"><%= shares %> <%= shares === 1 ? 'share' : 'shares' %></span></span>
+                  <span class="post-stats"><span data-i18n-count="readsCount" data-count="<%= reads %>"><%= reads %> <%= reads === 1 ? 'read' : 'reads' %></span> &middot; <span data-i18n-count="sharesCount" data-count="<%= shares %>"><%= shares %> <%= shares === 1 ? 'share' : 'shares' %></span></span>
                 </div>
                 <div class="muted" style="margin-top:6px;font-size:12px;">
                   <span data-i18n="<%= p.type === 'BLOG' ? 'blog' : (p.type === 'ESSAY' ? 'essay' : 'letter') %>"><%= p.type === 'BLOG' ? 'Blog' : (p.type === 'ESSAY' ? 'Essay' : 'Letter') %></span> &middot;

@@ -5,7 +5,8 @@
 // disconnects it (unless a job is on its way) and it exits.
 //
 // Messages in:  { type: "translate", id, lang, texts }
-// Messages out: { type: "result", id, outputs, model } | { type: "error", id, message } | { type: "idle" }
+// Messages out: { type: "result", id, outputs, model, alt } | { type: "error", id, message } | { type: "idle" }
+// (alt: indices of outputs that came from the language's fallback model)
 
 import path from "path";
 import { fileURLToPath } from "url";
@@ -65,22 +66,53 @@ async function loadLanguage(lang) {
   throw new Error(`No translation model could be loaded for ${lang} (${errors.join("; ")})`);
 }
 
+/**
+ * Translates `texts` with the first fallback model of the language that is not
+ * `loadedKey`; null when there is none or it cannot be used.
+ */
+async function translateWithFallback(lang, loadedKey, texts) {
+  const candidate = (MODELS[lang] || []).find((c) => modelKey(c) !== loadedKey);
+  if (!candidate) return null;
+  let model = null;
+  try {
+    model = await MarianModel.load(await fetchModel(candidate), { ort, threads: THREADS, targetToken: candidate.targetToken });
+    return await model.translate(texts, { beams: BEAMS });
+  } catch (err) {
+    log(`[translation] fallback ${modelKey(candidate)} for ${lang} unavailable: ${err.message}`);
+    return null;
+  } finally {
+    await model?.release();
+  }
+}
+
 async function translate(lang, texts) {
   const { model, key } = await loadLanguage(lang);
   const outputs = await model.translate(texts, { beams: BEAMS });
-  // Beam search very rarely produces a degenerate sentence; retry those with
-  // greedy decoding, and report the ones that still fail as null.
-  const suspicious = [];
-  outputs.forEach((out, i) => {
-    if (looksBroken(texts[i], out)) suspicious.push(i);
-  });
+  // Beam search very rarely produces a degenerate sentence, or one that adds
+  // something the source does not say. Retry those with greedy decoding, then
+  // with the language's other model, and report the ones that still fail as null.
+  const brokenIn = (list) => list.filter((i) => looksBroken(texts[i], outputs[i]));
+  let suspicious = brokenIn(outputs.map((_, i) => i));
   if (suspicious.length) {
     const retried = await model.translate(suspicious.map((i) => texts[i]), { beams: 1 });
     suspicious.forEach((index, j) => {
-      outputs[index] = looksBroken(texts[index], retried[j]) ? null : retried[j];
+      if (!looksBroken(texts[index], retried[j])) outputs[index] = retried[j];
+    });
+    suspicious = brokenIn(suspicious);
+  }
+  const alt = [];
+  if (suspicious.length) {
+    const fallback = await translateWithFallback(lang, key, suspicious.map((i) => texts[i]));
+    suspicious.forEach((index, j) => {
+      if (fallback && !looksBroken(texts[index], fallback[j])) {
+        outputs[index] = fallback[j];
+        alt.push(index);
+      } else {
+        outputs[index] = null;
+      }
     });
   }
-  return { outputs, model: key };
+  return { outputs, model: key, alt };
 }
 
 function armIdleTimer() {
@@ -97,8 +129,8 @@ process.on("message", (msg) => {
   clearTimeout(idleTimer);
   chain = chain.then(async () => {
     try {
-      const { outputs, model } = await translate(msg.lang, msg.texts);
-      process.send?.({ type: "result", id: msg.id, outputs, model });
+      const { outputs, model, alt } = await translate(msg.lang, msg.texts);
+      process.send?.({ type: "result", id: msg.id, outputs, model, alt });
     } catch (err) {
       process.send?.({ type: "error", id: msg.id, message: err?.message || String(err) });
     } finally {

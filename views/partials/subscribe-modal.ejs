@@ -1,6 +1,7 @@
 <div class="modal-overlay" id="subscribeModal" role="dialog" aria-modal="true" aria-labelledby="subscribeModalTitle" hidden>
   <div class="modal-box subscribe-modal-box">
     <div class="subscribe-modal-title" id="subscribeModalTitle" data-i18n="subscribe">Subscribe</div>
+    <%- include("ornament") %>
     <form class="subscribe-modal-body" id="subscribeModalBody" novalidate>
       <label class="visually-hidden" for="subscribeEmail" data-i18n="enterEmail">Enter your email address</label>
       <input type="email" class="form-input" id="subscribeEmail" name="email" data-i18n-placeholder="enterEmail" placeholder="Enter your email address" autocomplete="email" maxlength="254" required />

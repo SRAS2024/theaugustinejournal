@@ -76,15 +76,22 @@
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&family=Inter:wght@300;400;500&display=swap" rel="stylesheet"/>
   <style>
     :root { color-scheme: dark; }
-    body { margin:0; background:#0a0a0e; color:#e8e8ed; font-family:'Cormorant Garamond',Georgia,serif; display:flex; align-items:center; justify-content:center; min-height:100vh; padding:20px; box-sizing:border-box; }
-    .box { text-align:center; max-width:480px; }
-    h1 { font-size:28px; font-weight:500; margin:0 0 16px; }
-    p { font-size:17px; line-height:1.7; color:rgba(232,232,237,0.85); margin:0 0 24px; overflow-wrap:anywhere; }
-    .email { font-family:'Inter',sans-serif; font-size:14px; color:#e8e8ed; }
-    a, button { display:inline-block; padding:10px 20px; border-radius:8px; border:1px solid rgba(255,255,255,0.12); background:rgba(255,255,255,0.03); color:#e8e8ed; text-decoration:none; font-family:'Inter',sans-serif; font-size:13px; cursor:pointer; transition:border-color 0.2s, background 0.2s; margin:4px; }
-    a:hover, button:hover { border-color:rgba(168,139,212,0.45); background:rgba(91,45,142,0.12); }
+    *, *::before, *::after { box-sizing:border-box; }
+    html { background-color:#131211; }
+    body { margin:0; min-height:100vh; padding:24px 16px; display:flex; align-items:center; justify-content:center; background-color:#131211; background-image:url("/public/img/grain.png"), radial-gradient(ellipse 70% 50% at 50% 0%, rgba(91,45,142,0.075) 0%, transparent 70%); background-image:image-set(url("/public/img/grain.png") 1x, url("/public/img/grain.png") 2x), radial-gradient(ellipse 70% 50% at 50% 0%, rgba(91,45,142,0.075) 0%, transparent 70%); background-repeat:repeat, no-repeat; color:#ebe4d4; font-family:'Cormorant Garamond',Georgia,serif; -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale; }
+    ::selection { background:rgba(91,45,142,0.6); color:#fffaf0; }
+    .box { position:relative; width:100%; max-width:480px; padding:40px 32px 34px; text-align:center; background:rgba(241,235,221,0.022); border:1px solid rgba(241,235,221,0.075); border-radius:12px; box-shadow:inset 0 1px 0 rgba(255,250,240,0.03), 0 2px 14px rgba(0,0,0,0.3); }
+    .box::before { content:""; position:absolute; inset:5px; border:1px solid rgba(241,235,221,0.03); border-radius:8px; pointer-events:none; }
+    h1 { font-size:28px; font-weight:500; letter-spacing:0.02em; color:#f1ebdd; margin:0 0 18px; }
+    h1::after { content:""; display:block; width:150px; max-width:60%; height:1px; margin:18px auto 0; background:linear-gradient(to right, transparent, rgba(241,235,221,0.14), transparent); }
+    p { font-size:18px; line-height:1.7; color:#e2dbcb; margin:0 0 26px; overflow-wrap:anywhere; }
+    .email { display:inline-block; margin-top:6px; font-family:'Inter',sans-serif; font-size:14px; letter-spacing:0.02em; color:#ebe4d4; }
+    a, button { display:inline-block; padding:10px 20px; border-radius:8px; border:1px solid rgba(241,235,221,0.11); background:rgba(241,235,221,0.035); color:#ebe4d4; text-decoration:none; font-family:'Inter',sans-serif; font-size:13px; letter-spacing:0.02em; line-height:1.2; cursor:pointer; transition:border-color 0.2s, background 0.2s; margin:4px; }
+    button { background:rgba(91,45,142,0.13); border-color:rgba(132,92,188,0.34); color:#f1ebdd; }
+    a:hover, button:hover { border-color:rgba(150,112,204,0.5); background:rgba(91,45,142,0.2); }
     a:focus-visible, button:focus-visible { outline:2px solid #a88bd4; outline-offset:2px; }
     form { margin:0; }
+    @media (max-width:480px) { .box { padding:32px 20px 26px; } h1 { font-size:25px; } p { font-size:17px; } }
   </style>
 </head>
 <body>

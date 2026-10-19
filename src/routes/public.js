@@ -1,10 +1,9 @@
 // src/routes/public.js
 import { Router } from "express";
-import crypto from "crypto";
-import { nanoid } from "nanoid";
 import { getPrisma } from "../lib/db.js";
 import { getIndexNowKey } from "../lib/indexnow.js";
 import { plainText } from "../lib/translation/html.js";
+import { readSeconds, wordCount, makeReadTicket } from "../lib/reads.js";
 
 const router = Router();
 
@@ -102,24 +101,6 @@ function notFound(res) {
   return res.status(404).render("not-found", { title: "Page not found | The Augustine Journal", active: "" });
 }
 
-/**
- * Count one unique view. Raw SQL so the counter does not touch the post's
- * updatedAt (used for sitemap lastmod and dateModified).
- */
-async function trackView(req, post) {
-  const prisma = getPrisma();
-  const ip = req.ip || "unknown";
-  const ua = req.headers["user-agent"] || "";
-  const viewerIdentifier = crypto.createHash("sha256").update(`${ip}:${ua}`).digest("hex");
-  const inserted = await prisma.$executeRaw`
-    INSERT INTO "post_views" ("id", "post_id", "viewer_identifier")
-    VALUES (${nanoid()}, ${post.id}, ${viewerIdentifier})
-    ON CONFLICT ("post_id", "viewer_identifier") DO NOTHING`;
-  if (inserted) {
-    await prisma.$executeRaw`UPDATE "Post" SET "view_count" = "view_count" + 1 WHERE "id" = ${post.id}`;
-  }
-}
-
 /* ------------------------------------------------------------------ */
 /*  Routes                                                            */
 /* ------------------------------------------------------------------ */
@@ -192,17 +173,17 @@ router.get("/post/:slug", async (req, res, next) => {
       return notFound(res);
     }
 
-    // View tracking must never break the page.
-    if (req.method === "GET") {
-      trackView(req, post).catch(() => {});
-    }
-
+    // Opening the page is not a read: public/js/reads.js posts the ticket
+    // once the reader has spent the reading time on it and scrolled.
     const siteUrl = getSiteUrl();
+    const seconds = Math.round(readSeconds(wordCount(post.contentHtml)) * 10) / 10;
     res.render("post", {
       post,
       siteUrl,
       description: summary(post.contentHtml, 200),
-      jsonLd: articleJsonLd(post, siteUrl)
+      jsonLd: articleJsonLd(post, siteUrl),
+      readSeconds: seconds,
+      readTicket: makeReadTicket(post.id, seconds)
     });
   } catch (err) {
     next(err);
