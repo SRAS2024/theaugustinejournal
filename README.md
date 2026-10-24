@@ -183,7 +183,7 @@ theaugustinejournal/
       admin.js               # Admin form toggle and PDF upload AJAX logic
       admin-confirm.js       # Confirmation + password dialogs for admin deletions
       quill-init.js          # Rich text editor initialization (dual editor mode)
-    icons/                   # Favicon, BIMI icon and email artwork (SVG sources next to the PNGs)
+    icons/                   # Site icons, link-preview image (from scripts/favicon), BIMI icon and email artwork
     img/grain.png            # Charcoal grain texture
     site.webmanifest         # Web app manifest
   views/
@@ -194,7 +194,7 @@ theaugustinejournal/
     admin/                   # Login, welcome, dashboard, posts, post form, settings, subscribers
   scripts/
     format-posts.mjs         # Formats stored posts (dry run by default; --apply --backup <file>, --restore <file>)
-    generate-favicons.js     # Builds the favicon and app icons
+    favicon/build.sh         # Builds every site icon and the link-preview image (macOS: python3 + swiftc)
   test/                      # Unit tests (node --test)
   uploads/                   # PDF file storage (filesystem cache)
 ```

@@ -127,6 +127,12 @@ app.get("/health", (_req, res) => {
 app.get("/favicon.ico", (_req, res) => {
   res.sendFile(path.join(__dirname, "public", "icons", "favicon.ico"));
 });
+// iOS and some link-preview fetchers ask for these at the root without reading the page
+for (const name of ["apple-touch-icon.png", "apple-touch-icon-precomposed.png"]) {
+  app.get(`/${name}`, (_req, res) => {
+    res.sendFile(path.join(__dirname, "public", "icons", "apple-touch-icon.png"));
+  });
+}
 
 app.use("/public", express.static(path.join(__dirname, "public")));
 

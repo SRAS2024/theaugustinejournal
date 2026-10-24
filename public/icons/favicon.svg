@@ -1,23 +1,43 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
-  <!-- Parchment / scroll -->
-  <path d="M16 8 C16 8, 14 8, 14 10 L14 52 C14 54, 16 56, 18 56 L46 56 C48 56, 50 54, 50 52 L50 14 L44 8 Z"
-    fill="none" stroke="#d4c9a8" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.85"/>
-  <!-- Parchment fold corner -->
-  <path d="M44 8 L44 14 L50 14" fill="none" stroke="#d4c9a8" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.7"/>
-  <!-- Faint text lines on parchment -->
-  <line x1="20" y1="22" x2="40" y2="22" stroke="#d4c9a8" stroke-width="0.8" opacity="0.35"/>
-  <line x1="20" y1="28" x2="44" y2="28" stroke="#d4c9a8" stroke-width="0.8" opacity="0.3"/>
-  <line x1="20" y1="34" x2="42" y2="34" stroke="#d4c9a8" stroke-width="0.8" opacity="0.25"/>
-  <line x1="20" y1="40" x2="38" y2="40" stroke="#d4c9a8" stroke-width="0.8" opacity="0.2"/>
-  <!-- Quill pen — angled, sketched style -->
-  <path d="M38 50 C40 42, 44 30, 48 18 C49 14, 52 8, 54 6"
-    fill="none" stroke="#e8e8ed" stroke-width="1.4" stroke-linecap="round" opacity="0.9"/>
-  <!-- Quill feather barbs -->
-  <path d="M54 6 C52 8, 50 6, 52 4" fill="none" stroke="#e8e8ed" stroke-width="1" stroke-linecap="round" opacity="0.7"/>
-  <path d="M53 8 C51 10, 48 8, 51 7" fill="none" stroke="#e8e8ed" stroke-width="0.8" stroke-linecap="round" opacity="0.5"/>
-  <path d="M52 10 C50 12, 47 10, 50 9" fill="none" stroke="#e8e8ed" stroke-width="0.8" stroke-linecap="round" opacity="0.4"/>
-  <!-- Quill nib -->
-  <path d="M38 50 L37 52 L39 51 Z" fill="#e8e8ed" opacity="0.8"/>
-  <!-- Small ink dot -->
-  <circle cx="37" cy="52" r="1" fill="#a88bd4" opacity="0.5"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+<title>The Augustine Journal</title>
+<defs>
+<clipPath id="tile"><rect width="512" height="512" rx="97.28"/></clipPath>
+<radialGradient id="glow" gradientUnits="userSpaceOnUse" cx="0" cy="0" r="512" gradientTransform="translate(256 0) scale(0.7 0.5)">
+  <stop offset="0" stop-color="#5b2d8e" stop-opacity="0.075"/><stop offset="0.7" stop-color="#5b2d8e" stop-opacity="0"/>
+</radialGradient>
+<linearGradient id="leather" gradientUnits="userSpaceOnUse" x1="5.0" y1="5.25" x2="13.0" y2="15.0">
+  <stop offset="0" stop-color="#2b2723"/><stop offset="1" stop-color="#110f0e"/>
+</linearGradient>
+<linearGradient id="fore" gradientUnits="userSpaceOnUse" x1="0" y1="5.25" x2="0" y2="15.0">
+  <stop offset="0" stop-color="#ebe3d1"/><stop offset="1" stop-color="#c8bda3"/>
+</linearGradient>
+<linearGradient id="bb" gradientUnits="userSpaceOnUse" x1="0" y1="3.25" x2="0" y2="13.0">
+  <stop offset="0" stop-color="#6f665d"/><stop offset="1" stop-color="#3d3833"/>
+</linearGradient>
+<linearGradient id="vane" gradientUnits="userSpaceOnUse" x1="6.490" y1="8.467" x2="8.389" y2="9.578">
+  <stop offset="0" stop-color="#f7f3ea"/><stop offset="0.6" stop-color="#eee8d8"/><stop offset="1" stop-color="#d6ccb4"/>
+</linearGradient>
+</defs>
+<g clip-path="url(#tile)">
+<rect width="512" height="512" fill="#131211"/>
+<rect width="512" height="512" fill="url(#glow)"/>
+<g transform="scale(32)">
+<g transform="translate(16 0) scale(-1 1)">
+<path d="M5.000,15.000 L2.000,13.000 L2.000,3.250 L10.000,1.000 Q11.812,1.750 13.000,3.000 L13.000,12.500 Z" fill="#1a1715"/>
+<path d="M2.000,3.250 L10.000,1.000 Q11.812,1.750 13.000,3.000 L11.000,1.667 L3.000,3.917 Z" fill="#5a534c"/>
+<path d="M2.000,3.250 L3.000,3.917 L3.000,13.667 L2.000,13.000 Z" fill="#24201d"/>
+<path d="M2.000,3.250 L2.500,3.583 L2.500,13.333 L2.000,13.000 Z" fill="url(#bb)"/>
+<path d="M5.000,5.250 L13.000,3.000 L11.000,1.667 L3.000,3.917 Z" fill="#f2ecdf"/>
+<path d="M5.000,5.250 L3.000,3.917 L3.000,13.667 L5.000,15.000 Z" fill="url(#fore)"/>
+<path d="M5.000,15.000 L5.000,5.250 L13.000,3.000 L13.000,12.500 Z" fill="url(#leather)"/>
+<path d="M5.000,5.250 L13.000,3.000 L13.000,3.300 L5.000,5.550 Z" fill="#4f4842"/>
+<path d="M12.250,3.200 L13.000,3.000 L13.000,12.500 L12.250,12.734 Z" fill="#5e5750"/>
+<path d="M5.000,15.000 L13.000,12.500 L13.000,11.900 L5.000,14.400 Z" fill="#57504a"/>
+</g>
+<path d="M6.027,12.050 L5.856,11.757 L5.696,11.470 L5.560,11.198 L5.457,10.945 L5.398,10.718 L5.389,10.520 L5.435,10.354 L5.519,10.211 L5.603,10.067 L5.687,9.924 L5.770,9.780 L5.852,9.635 L5.934,9.490 L6.015,9.345 L6.333,9.339 L6.650,9.332 L6.872,9.269 L6.714,8.983 L6.555,8.698 L6.490,8.467 L6.567,8.320 L6.644,8.172 L6.723,8.026 L6.807,7.882 L6.896,7.742 L6.990,7.604 L7.090,7.469 L7.194,7.338 L7.304,7.210 L7.420,7.085 L7.543,6.964 L7.672,6.847 L7.808,6.734 L7.953,6.626 L8.107,6.523 L8.271,6.427 L8.450,6.339 L8.646,6.261 L8.871,6.200 L9.200,6.200 L9.200,6.200 L9.271,6.434 L9.282,6.634 L9.277,6.823 L9.262,7.007 L9.240,7.187 L9.211,7.363 L9.177,7.535 L9.138,7.705 L9.095,7.873 L9.048,8.038 L8.997,8.201 L8.943,8.361 L8.884,8.520 L8.823,8.677 L8.758,8.831 L8.690,8.984 L8.618,9.135 L8.543,9.283 L8.466,9.431 L8.389,9.578 L8.311,9.726 L8.232,9.872 L8.154,10.019 L8.074,10.165 L7.994,10.311 L7.914,10.457 L7.833,10.602 L7.751,10.747 L7.669,10.891 L7.586,11.035 L7.502,11.179 L7.418,11.322 L7.332,11.465 L7.223,11.594 L7.082,11.704 L6.912,11.797 L6.715,11.874 L6.498,11.940 L6.267,11.997 L6.027,12.050Z" fill="url(#vane)"/>
+<path d="M4.906,13.265 L6.063,11.410 L6.602,11.726 L5.338,13.518 Z" fill="#e4d9c2"/>
+<path d="M4.950,13.181 L4.400,14.400 L5.403,13.446 Z" fill="#1a1714"/>
+<path d="M6.232,11.729 L6.390,11.475 L6.547,11.220 L6.701,10.963 L6.852,10.705 L7.002,10.446 L7.149,10.185 L7.295,9.924 L7.438,9.661 L7.580,9.397 L7.720,9.132 L7.859,8.867 L7.997,8.600 L8.133,8.333 L8.268,8.066 L8.403,7.798 L8.537,7.529 L8.671,7.261 L8.804,6.992 L8.938,6.724 L9.072,6.455" fill="none" stroke="#b3a78f" stroke-width="0.25" stroke-linecap="round"/>
+</g>
+</g>
 </svg>

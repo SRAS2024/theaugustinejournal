@@ -73,7 +73,7 @@ function articleJsonLd(post, siteUrl) {
       name: "The Augustine Journal",
       logo: { "@type": "ImageObject", url: `${siteUrl}/public/icons/icon-512.png` }
     },
-    image: `${siteUrl}/public/icons/icon-512.png`
+    image: `${siteUrl}/public/icons/og-image.jpg`
   };
   if (description) obj.description = description;
   return toJsonLd(obj);

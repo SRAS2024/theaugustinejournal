@@ -200,3 +200,49 @@ test("the post, list and 404 pages keep their structure around the ornament", ()
   assert.match(read("views/pages/not-found.ejs"), /data-i18n="pageNotFoundMessage"/);
   assert.match(read("views/partials/subscribe-modal.ejs"), /class="visually-hidden" for="subscribeEmail"/);
 });
+
+// A public path the icons use, as a file in the repository (/favicon.ico is served from public/icons)
+const iconFile = (url) => path.join(ROOT, url.split("?")[0] === "/favicon.ico" ? "public/icons/favicon.ico" : url.split("?")[0].replace(/^\//, ""));
+const pngSize = (file) => {
+  const png = fs.readFileSync(file);
+  assert.equal(png.subarray(1, 4).toString("ascii"), "PNG", file);
+  return `${png.readUInt32BE(16)}x${png.readUInt32BE(20)}`;
+};
+
+test("every icon the pages link to exists at the size it claims", async () => {
+  const icons = await ejs.renderFile(path.join(ROOT, "views/partials/icons.ejs"), {});
+  const links = [...icons.matchAll(/<link ([^>]+)>/g)].map((m) => ({
+    rel: m[1].match(/rel="([^"]+)"/)[1],
+    attrs: m[1],
+    href: m[1].match(/href="([^"]+)"/)[1]
+  }));
+  for (const rel of ["icon", "apple-touch-icon", "manifest"]) assert.ok(links.some((l) => l.rel === rel), rel);
+  assert.ok(links.some((l) => /type="image\/svg\+xml"/.test(l.attrs)), "an SVG icon for browser tabs");
+  for (const { attrs, href } of links) {
+    assert.match(href, /\?v=\d+$/, `${href} is versioned so caches pick up a new icon`);
+    assert.ok(fs.existsSync(iconFile(href)), href);
+    const sizes = attrs.match(/sizes="(\d+x\d+)"/);
+    if (sizes && href.split("?")[0].endsWith(".png")) assert.equal(pngSize(iconFile(href)), sizes[1], href);
+  }
+  assert.equal(pngSize(path.join(ROOT, "public/icons/apple-touch-icon.png")), "180x180");
+
+  const manifest = JSON.parse(read("public/site.webmanifest"));
+  assert.ok(manifest.icons.some((i) => i.purpose === "maskable"), "a maskable icon for Android");
+  for (const icon of manifest.icons) assert.equal(pngSize(iconFile(icon.src)), icon.sizes, icon.src);
+
+  const ico = fs.readFileSync(path.join(ROOT, "public/icons/favicon.ico"));
+  assert.deepEqual([ico.readUInt16LE(2), ico.readUInt16LE(4)], [1, 3], "an icon file with 16, 32 and 48 px images");
+  assert.deepEqual([0, 1, 2].map((i) => ico[6 + 16 * i]), [16, 32, 48]);
+});
+
+test("every page carries the icons, and link previews show the site image", () => {
+  assert.match(read("views/layout.ejs"), /include\("partials\/icons"\)/);
+  assert.match(read("views/partials/admin-head.ejs"), /include\("icons"\)/);
+  assert.match(read("views/unsubscribe.ejs"), /include\("partials\/icons"\)/);
+  for (const file of ["views/layout.ejs", "views/post.ejs", "src/routes/public.js"]) {
+    assert.match(read(file), /\/public\/icons\/og-image\.jpg/, file);
+  }
+  const jpg = fs.readFileSync(path.join(ROOT, "public/icons/og-image.jpg"));
+  assert.equal(jpg.readUInt16BE(0), 0xffd8, "a JPEG");
+  assert.ok(jpg.length < 300 * 1024, `${jpg.length} bytes (WhatsApp drops preview images over about 300 KB)`);
+});
